@@ -807,6 +807,25 @@ if (!app.requestSingleInstanceLock()) {
     settings = createSettingsStore({
       defaults: config,
       filePath: path.join(app.getPath('userData'), 'settings.json'),
+      // Exactly the fields the settings window exposes, and nothing else.
+      //
+      // Notably absent: whisper.binary, which is handed to spawn(), and the
+      // Ollama and Qdrant base URLs, which decide where transcripts are sent.
+      // Leaving those writable would let anything able to edit an ordinary
+      // user-owned JSON file choose the program that runs at next launch, or
+      // ship every transcript to a remote host.
+      editable: [
+        'agent.temperature',
+        'agent.numPredict',
+        'agent.historyTurns',
+        'agent.qdrant.topK',
+        'agent.qdrant.scoreThreshold',
+        'audio.vad.redemptionMs',
+        'audio.vad.minSpeechMs',
+        'audio.vad.preSpeechPadMs',
+        'audio.vad.positiveSpeechThreshold',
+        'audio.vad.negativeSpeechThreshold',
+      ],
     });
 
     configureSession();

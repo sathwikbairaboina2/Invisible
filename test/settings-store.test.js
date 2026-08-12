@@ -79,6 +79,89 @@ test('rejects a value whose type differs from the default', () => {
   assert.throws(() => store.set({ agent: { temperature: 'hot' } }), /agent\.temperature.*number/);
 });
 
+// ---------------------------------------------------------------------------
+// Hardening: this store is reachable from any renderer over IPC, and its file
+// is plain user-writable JSON. Neither may be able to choose what gets
+// executed or where the transcript is sent.
+// ---------------------------------------------------------------------------
+
+const HARDENED = {
+  defaults: {
+    whisper: { binary: 'bin/whisper-server.exe', port: 8178 },
+    agent: {
+      ollamaBaseUrl: 'http://127.0.0.1:11435',
+      model: 'qwen2.5-coder:14b',
+      temperature: 0.2,
+      qdrant: { url: 'http://127.0.0.1:6333', scoreThreshold: 0.6 },
+    },
+  },
+  editable: ['agent.temperature', 'agent.qdrant.scoreThreshold'],
+};
+
+test('refuses to let a caller choose which executable gets spawned', () => {
+  // createSidecar spawns config.whisper.binary. Anything that can write this
+  // store could otherwise pick the program, and settings.json is an ordinary
+  // user-writable file — no renderer compromise required.
+  const store = createSettingsStore({ ...HARDENED, filePath: tempFile() });
+
+  assert.throws(
+    () => store.set({ whisper: { binary: 'C:\\Windows\\System32\\calc.exe' } }),
+    /not editable/
+  );
+  assert.equal(store.get().whisper.binary, 'bin/whisper-server.exe');
+});
+
+test('refuses to redirect the model endpoint off the machine', () => {
+  // "Nothing leaves the machine" is the central promise of this design. A
+  // settable base URL would hand every transcript to a remote host.
+  const store = createSettingsStore({ ...HARDENED, filePath: tempFile() });
+
+  assert.throws(
+    () => store.set({ agent: { ollamaBaseUrl: 'http://evil.example.com' } }),
+    /not editable/
+  );
+  assert.throws(
+    () => store.set({ agent: { qdrant: { url: 'http://evil.example.com' } } }),
+    /not editable/
+  );
+});
+
+test('still allows the tuning values the settings window exposes', () => {
+  const store = createSettingsStore({ ...HARDENED, filePath: tempFile() });
+
+  const next = store.set({ agent: { temperature: 0.5, qdrant: { scoreThreshold: 0.7 } } });
+  assert.equal(next.agent.temperature, 0.5);
+  assert.equal(next.agent.qdrant.scoreThreshold, 0.7);
+});
+
+test('ignores non-editable keys already present in the file on disk', () => {
+  // Validation on write is not enough: the file is user-writable, so anything
+  // could put a path in it directly and never call set().
+  const filePath = tempFile();
+  fs.writeFileSync(
+    filePath,
+    JSON.stringify({
+      whisper: { binary: 'C:\\Windows\\System32\\calc.exe' },
+      agent: { temperature: 0.9 },
+    })
+  );
+
+  const store = createSettingsStore({ ...HARDENED, filePath });
+
+  assert.equal(store.get().whisper.binary, 'bin/whisper-server.exe', 'injected path ignored');
+  assert.equal(store.get().agent.temperature, 0.9, 'legitimate override still applied');
+});
+
+test('rejects prototype-manipulating keys explicitly', () => {
+  // Currently unreachable because the recursive walk rejects them a level
+  // down, but that is safety by accident. Asserted so it stays deliberate.
+  const store = createSettingsStore({ ...HARDENED, filePath: tempFile() });
+
+  assert.throws(() => store.set(JSON.parse('{"__proto__":{"x":1}}')), /not editable|unknown/);
+  assert.throws(() => store.set(JSON.parse('{"constructor":{"x":1}}')), /not editable|unknown/);
+  assert.equal({}.x, undefined);
+});
+
 test('survives a corrupt settings file rather than failing to launch', () => {
   // A half-written file must not brick the app on the morning of an interview.
   const filePath = tempFile();
