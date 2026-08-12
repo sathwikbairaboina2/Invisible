@@ -78,8 +78,13 @@ function createWhisperClient({ baseUrl, fetchImpl = fetch, timeoutMs = 30000, la
       throw new Error('whisper: response had no text field');
     }
 
+    // whisper.cpp joins its internal segments with newlines, so one spoken
+    // sentence arrives split mid-clause. Collapsing all whitespace gives the
+    // overlay a single readable line and keeps the prompt free of stray breaks.
+    const normalized = payload.text.replace(/\s+/g, ' ').trim();
+
     return {
-      text: isNonSpeech(payload.text) ? '' : payload.text.trim(),
+      text: isNonSpeech(normalized) ? '' : normalized,
       ms: Date.now() - started,
     };
   }

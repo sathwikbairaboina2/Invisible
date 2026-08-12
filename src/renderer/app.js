@@ -19,8 +19,21 @@
 
   function setStatus(state) {
     const live = Boolean(state.capturing);
-    el.dot.className = 'dot' + (live ? ' live' : '');
-    el.statusText.textContent = live ? 'listening' : 'idle';
+    const stt = state.stt ?? 'stopped';
+
+    el.dot.className =
+      'dot' + (live && stt === 'ready' ? ' live' : stt === 'failed' ? ' error' : '');
+
+    let label;
+    if (stt === 'starting') label = 'loading model…';
+    else if (stt === 'failed') label = 'transcription offline';
+    else if (!live) label = 'idle';
+    else if (stt !== 'ready') label = 'waiting for model';
+    else label = 'listening';
+
+    if (state.dropped > 0) label += ` · ${state.dropped} dropped`;
+
+    el.statusText.textContent = label;
     el.body.classList.toggle('interactive', Boolean(state.interactive));
 
     if (typeof state.level === 'number' && state.speakerLevel) {

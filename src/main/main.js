@@ -13,6 +13,9 @@ const path = require('node:path');
 
 const config = require('./config');
 const { CHANNELS } = require('./channels');
+const { createSidecar } = require('../whisper/sidecar');
+const { createWhisperClient } = require('../whisper/client');
+const { createSerialQueue } = require('../whisper/queue');
 
 const IS_DEV = !app.isPackaged || process.env.INVISIBLE_DEV === '1';
 const IS_WIN = process.platform === 'win32';
@@ -42,6 +45,8 @@ let overlayWin = null;
 let audioWin = null;
 /** @type {import('../graph/graph').AgentRuntime | null} */
 let agent = null;
+/** @type {ReturnType<typeof createSidecar> | null} */
+let sidecar = null;
 
 const state = {
   visible: true,
@@ -49,6 +54,10 @@ const state = {
   interactive: false,
   /** True once the audio worker reports a live capture graph. */
   capturing: false,
+  /** whisper-server lifecycle, mirrored to the overlay. */
+  stt: 'stopped',
+  /** Utterances discarded because the transcription backlog was full. */
+  dropped: 0,
 };
 
 // ---------------------------------------------------------------------------
@@ -411,8 +420,38 @@ function initAgent() {
     return null;
   }
 
+  const client = createWhisperClient({
+    baseUrl: sidecar.baseUrl,
+    timeoutMs: config.whisper.requestTimeoutMs,
+    language: config.whisper.language,
+  });
+
+  const queue = createSerialQueue({
+    maxDepth: config.whisper.maxQueueDepth,
+    onDrop: (n) => {
+      state.dropped += n;
+      log('dropped utterance, backlog full; total', state.dropped);
+      pushStatus({});
+    },
+  });
+
+  /**
+   * The transcribe function handed to the graph. Serialised here rather than
+   * inside the client, so the backlog is bounded and observable instead of
+   * queueing invisibly inside whisper-server.
+   */
+  async function transcribe(pcm, sampleRate) {
+    if (!sidecar.isReady()) {
+      throw new Error('whisper-server is not ready');
+    }
+    const { text, ms } = await queue.push(() => client.transcribe(pcm, sampleRate));
+    log('transcribed', `${ms}ms`, `${(pcm.length / sampleRate).toFixed(1)}s audio`, JSON.stringify(text));
+    return text;
+  }
+
   return createAgentRuntime({
     config: config.agent,
+    transcribe,
     // Every emitter below is the single path from graph -> UI.
     onTurnStart: (turn) => {
       log('turn start', turn.turnId, turn.speaker);
@@ -425,11 +464,16 @@ function initAgent() {
     },
     onTranscriptFinal: (seg) => sendToOverlay(CHANNELS.TRANSCRIPT_FINAL, seg),
     onTranscriptPartial: (seg) => sendToOverlay(CHANNELS.TRANSCRIPT_PARTIAL, seg),
-    onError: (err) =>
+    onError: (err) => {
+      // Logged as well as sent: without this, an agent-path failure is visible
+      // only on the overlay, which is exactly the surface you cannot read while
+      // diagnosing one.
+      log('agent error:', err?.message ?? String(err));
       sendToOverlay(CHANNELS.AGENT_ERROR, {
         scope: 'agent',
         message: err?.message ?? String(err),
-      }),
+      });
+    },
   });
 }
 
@@ -521,9 +565,34 @@ if (!app.requestSingleInstanceLock()) {
     configureSession();
     createOverlayWindow();
     createAudioWorker();
+
+    // Constructed before initAgent, which reads sidecar.baseUrl when it builds
+    // the whisper client.
+    sidecar = createSidecar({
+      config: config.whisper,
+      root: path.join(__dirname, '..', '..'),
+      onLog: (line) => log('whisper:', line),
+      onStateChange: (next, detail) => {
+        state.stt = next;
+        pushStatus({});
+        if (next === 'failed') {
+          sendToOverlay(CHANNELS.AGENT_ERROR, {
+            scope: 'stt',
+            message: detail ?? 'whisper-server failed',
+          });
+        }
+      },
+    });
+
     agent = initAgent();
     registerIpc();
     registerShortcuts();
+
+    // Deliberately not awaited: the overlay and both capture chains must come
+    // up immediately. Utterances that arrive before the model finishes loading
+    // fail with "whisper-server is not ready", which surfaces as an error
+    // rather than a hang.
+    sidecar.start().catch((err) => log('whisper failed to start:', err.message));
 
     // Kick off capture once the worker's preload has attached.
     audioWin?.webContents.once('did-finish-load', () => {
@@ -545,6 +614,8 @@ if (!app.requestSingleInstanceLock()) {
   app.on('will-quit', () => {
     globalShortcut.unregisterAll();
     agent?.dispose();
+    // An orphaned whisper-server would hold 1.6 GB of VRAM after the app exits.
+    sidecar?.stop();
   });
 
   // A crash in a node must not take the overlay down mid-interview.

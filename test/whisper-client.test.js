@@ -55,6 +55,21 @@ test('trims the leading space whisper.cpp emits', async () => {
   assert.equal(typeof result.ms, 'number');
 });
 
+test('collapses the newlines whisper.cpp puts between segments', async () => {
+  // whisper.cpp joins its internal segments with newlines, so a single spoken
+  // sentence comes back split mid-clause. Left alone it renders as a broken
+  // line in the overlay and reaches the model as noise.
+  const client = createWhisperClient({
+    baseUrl: 'http://x',
+    fetchImpl: fakeFetch({
+      text: ' How would you design a distributed rate limiter for a\n public API?',
+    }),
+  });
+
+  const result = await client.transcribe(speech(), 16000);
+  assert.equal(result.text, 'How would you design a distributed rate limiter for a public API?');
+});
+
 test('maps whisper non-speech markers to an empty string', async () => {
   // VAD lets through the occasional cough or door slam. whisper.cpp labels
   // these rather than returning nothing, and those labels must never reach the
