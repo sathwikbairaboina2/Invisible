@@ -10,6 +10,9 @@
     "test": "node --test \"test/**/*.test.js\"",
     "vendor": "node scripts/copy-vendor.js",
     "fetch-whisper": "node scripts/fetch-whisper.js",
+    "ollama:up": "docker compose -f docker/ollama.compose.yml up -d",
+    "ollama:down": "docker compose -f docker/ollama.compose.yml down",
+    "ollama:pull": "docker exec invisible-ollama ollama pull qwen2.5-coder:14b-instruct-q4_K_M",
     "postinstall": "node scripts/copy-vendor.js"
   },
   "engines": {

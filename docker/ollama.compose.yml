@@ -1,0 +1,40 @@
+# Ollama for Invisible, deliberately separate from any other project's stack.
+#
+# Two existing containers on this machine (avatara-backend, marketplace) both
+# run Ollama, both bind host port 11434, and both were created without GPU
+# access. Reusing either would tie this app's runtime to another project's
+# compose lifecycle and would run a 14B model on CPU at roughly 2-3 tokens per
+# second. Hence: own service, own volume, own port.
+
+name: invisible
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: invisible-ollama
+    restart: unless-stopped
+    ports:
+      # 11435 on the host to stay clear of the two containers already using
+      # 11434. Inside the container Ollama still listens on its default port.
+      - "127.0.0.1:11435:11434"
+    volumes:
+      - invisible-ollama-models:/root/.ollama
+    environment:
+      # Keep the model resident between questions. The default unloads after a
+      # few minutes idle, which would put a full model load in front of the
+      # first question after any pause in the conversation.
+      OLLAMA_KEEP_ALIVE: "30m"
+      # One model, one request at a time: this is a latency-sensitive single
+      # user, not a throughput-sensitive service.
+      OLLAMA_NUM_PARALLEL: "1"
+      OLLAMA_MAX_LOADED_MODELS: "1"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+volumes:
+  invisible-ollama-models:
