@@ -63,6 +63,9 @@ const state = {
   llm: 'unknown',
 };
 
+/** Per-turn timing, keyed by turnId. Entries are deleted on turn end. */
+const turnMetrics = new Map();
+
 // ---------------------------------------------------------------------------
 // Small helpers
 // ---------------------------------------------------------------------------
@@ -470,6 +473,14 @@ function initAgent() {
       log('ollama', state.llm, result.error ?? '');
       pushStatus({});
 
+      if (state.llm === 'ready') {
+        // Not awaited: the cold load takes ~18 s and must not gate startup.
+        // Without it that cost lands on the first question of the interview.
+        ollama.warmup().then((warm) => {
+          log('ollama warmup', warm.ok ? `${warm.ms}ms` : `failed: ${warm.error}`);
+        });
+      }
+
       if (state.llm === 'no-model') {
         sendToOverlay(CHANNELS.AGENT_ERROR, {
           scope: 'llm',
@@ -490,12 +501,30 @@ function initAgent() {
     stream: ollama.stream,
     // Every emitter below is the single path from graph -> UI.
     onTurnStart: (turn) => {
+      // Time-to-first-token is the number the operator actually feels; steady
+      // state throughput is far above reading speed. Tracked per turn so a
+      // regression shows up in the log rather than only as a vibe.
+      turnMetrics.set(turn.turnId, { startedAt: Date.now(), firstTokenMs: null, tokens: 0 });
       log('turn start', turn.turnId, turn.speaker);
       sendToOverlay(CHANNELS.AGENT_TURN_START, turn);
     },
-    onToken: (turnId, token) => sendToOverlay(CHANNELS.AGENT_TOKEN, { turnId, token }),
+    onToken: (turnId, token) => {
+      const metric = turnMetrics.get(turnId);
+      if (metric) {
+        if (metric.firstTokenMs === null) metric.firstTokenMs = Date.now() - metric.startedAt;
+        metric.tokens += 1;
+      }
+      sendToOverlay(CHANNELS.AGENT_TOKEN, { turnId, token });
+    },
     onTurnEnd: (turn) => {
-      log('turn end', turn.turnId, turn.aborted ? 'aborted' : 'complete');
+      const metric = turnMetrics.get(turn.turnId);
+      turnMetrics.delete(turn.turnId);
+      log(
+        'turn end',
+        turn.turnId,
+        turn.aborted ? 'aborted' : 'complete',
+        metric ? `first-token ${metric.firstTokenMs}ms, ${metric.tokens} tokens in ${Date.now() - metric.startedAt}ms` : ''
+      );
       sendToOverlay(CHANNELS.AGENT_TURN_END, turn);
     },
     onTranscriptFinal: (seg) => sendToOverlay(CHANNELS.TRANSCRIPT_FINAL, seg),

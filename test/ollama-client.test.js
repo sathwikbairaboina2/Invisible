@@ -5,17 +5,26 @@ const assert = require('node:assert/strict');
 
 const { createOllamaClient } = require('../src/ollama/client');
 
-/** Minimal stand-in for ChatOllama: records the call, yields canned chunks. */
+/**
+ * Minimal stand-in for ChatOllama: records the call, yields canned chunks.
+ *
+ * `stream` is an async function returning an async generator, not an async
+ * generator itself. That distinction is load-bearing: LangChain's
+ * Runnable.stream() returns a Promise of an IterableReadableStream, so a fake
+ * that is directly iterable would let broken code pass. It did, once.
+ */
 function fakeChat(chunks, record = {}) {
   return {
-    async *stream(messages, options) {
+    async stream(messages, options) {
       record.messages = messages;
       record.options = options;
-      for (const chunk of chunks) {
-        if (options?.signal?.aborted) return;
-        yield { content: chunk };
-        await new Promise((resolve) => setTimeout(resolve, 5));
-      }
+      return (async function* () {
+        for (const chunk of chunks) {
+          if (options?.signal?.aborted) return;
+          yield { content: chunk };
+          await new Promise((resolve) => setTimeout(resolve, 5));
+        }
+      })();
     },
   };
 }
@@ -100,6 +109,45 @@ test('skips empty chunks rather than emitting blank tokens', async () => {
 
   const tokens = await collect(client.stream({ utterance: 'q' }));
   assert.deepEqual(tokens, ['Hello', ' world']);
+});
+
+test('warmup asks Ollama to load the model without generating anything', async () => {
+  // A cold model load costs ~18 s and would otherwise land on the operator's
+  // first question of the interview. An empty prompt is Ollama's documented
+  // load-only call, so this pays that cost at app start and emits no tokens.
+  const record = {};
+  const client = createOllamaClient({
+    baseUrl: 'http://127.0.0.1:11435',
+    model: 'qwen2.5-coder:14b-instruct-q4_K_M',
+    keepAlive: '30m',
+    fetchImpl: async (url, init) => {
+      record.url = url;
+      record.body = JSON.parse(init.body);
+      return { ok: true, json: async () => ({ done: true }) };
+    },
+  });
+
+  const result = await client.warmup();
+
+  assert.equal(record.url, 'http://127.0.0.1:11435/api/generate');
+  assert.equal(record.body.model, 'qwen2.5-coder:14b-instruct-q4_K_M');
+  assert.equal(record.body.prompt, '', 'an empty prompt loads without generating');
+  assert.equal(record.body.keep_alive, '30m');
+  assert.equal(result.ok, true);
+});
+
+test('warmup failure is reported, never thrown', async () => {
+  const client = createOllamaClient({
+    baseUrl: 'http://x',
+    model: 'm',
+    fetchImpl: async () => {
+      throw new Error('connect ECONNREFUSED');
+    },
+  });
+
+  const result = await client.warmup();
+  assert.equal(result.ok, false);
+  assert.match(result.error, /ECONNREFUSED/);
 });
 
 test('probe reports reachability and whether the model is pulled', async () => {

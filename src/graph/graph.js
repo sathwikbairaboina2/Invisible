@@ -92,8 +92,14 @@ function createAgentRuntime(options = {}) {
   async function run({ speaker, pcm, sampleRate, utterance, forceRespond = false }) {
     if (disposed) return;
 
-    // A new utterance always wins over one still generating.
-    abortInFlight();
+    // Only the other party's speech supersedes an answer in progress.
+    //
+    // The operator reads this overlay *while talking*, so cancelling on their
+    // own voice would delete the advice at the exact moment they start using
+    // it. Their utterance still runs through the graph — it belongs in the
+    // transcript — it just does not cancel anything on the way.
+    if (speaker === 'remote') abortInFlight();
+
     const controller = new AbortController();
     inFlight = controller;
 
@@ -131,7 +137,12 @@ function createAgentRuntime(options = {}) {
       if (started) onTurnEnd?.({ turnId, aborted: controller.signal.aborted });
     } catch (err) {
       if (started) onTurnEnd?.({ turnId, aborted: true });
-      onError?.(err);
+
+      // A supersede is a deliberate act, not a failure. Reporting it would put
+      // "Aborted" in the overlay's error banner every time the interviewer
+      // asks a follow-up question.
+      const deliberate = controller.signal.aborted || err?.name === 'AbortError';
+      if (!deliberate) onError?.(err);
     } finally {
       // Only clear if this turn is still the current one; a turn that was
       // superseded must not null out its successor's controller.

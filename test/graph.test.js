@@ -389,6 +389,93 @@ test('a transcriber failure surfaces as an error without killing the runtime', a
   runtime.dispose();
 });
 
+test('the operator speaking does not cancel the answer they are reading', async () => {
+  // The whole point of the overlay is that you read it while you talk. If your
+  // own voice aborts generation, the advice vanishes exactly when you start
+  // using it. Found by watching a real run: the mic echo of the interviewer's
+  // question killed the answer to that same question.
+  const { events, handlers } = collector();
+
+  const runtime = createAgentRuntime({
+    ...handlers,
+    transcribe: async (pcm, sampleRate, speaker) => 'How would you shard this table?',
+    stream: async function* () {
+      for (const token of ['Range ', 'partition ', 'on ', 'tenant ', 'id.']) {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        yield token;
+      }
+    },
+  });
+
+  const answering = runtime.submitUtterance({
+    speaker: 'remote',
+    pcm: silence(),
+    sampleRate: 16000,
+    durationMs: 1000,
+  });
+  await waitFor(() => events.tokens.length > 0);
+
+  // The operator starts talking mid-answer.
+  await runtime.submitUtterance({
+    speaker: 'user',
+    pcm: silence(),
+    sampleRate: 16000,
+    durationMs: 1000,
+  });
+  await answering;
+
+  assert.equal(events.ends.length, 1);
+  assert.equal(events.ends[0].aborted, false, 'own speech must not abort the answer');
+  assert.equal(events.tokens.length, 5, 'the full answer should have streamed');
+
+  runtime.dispose();
+});
+
+test('a deliberate supersede is not reported as an error', async () => {
+  // Cancelling on purpose is not a failure, and surfacing it puts "Aborted" in
+  // the overlay's error banner every time the interviewer asks a follow-up.
+  const { events, handlers } = collector();
+
+  const runtime = createAgentRuntime({
+    ...handlers,
+    transcribe: async () => 'A real question about sharding?',
+    // Throws on abort, which is what ChatOllama actually does. A fake that
+    // returns quietly instead would hide this bug — it did, on the first try.
+    stream: async function* (_state, signal) {
+      for (let i = 0; i < 20; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        if (signal?.aborted) {
+          const err = new Error('Aborted');
+          err.name = 'AbortError';
+          throw err;
+        }
+        yield `t${i} `;
+      }
+    },
+  });
+
+  const first = runtime.submitUtterance({
+    speaker: 'remote',
+    pcm: silence(),
+    sampleRate: 16000,
+    durationMs: 1000,
+  });
+  await waitFor(() => events.tokens.length > 0);
+
+  const second = runtime.submitUtterance({
+    speaker: 'remote',
+    pcm: silence(),
+    sampleRate: 16000,
+    durationMs: 1000,
+  });
+  await Promise.all([first, second]);
+
+  assert.equal(events.ends[0].aborted, true, 'the first turn should still be marked aborted');
+  assert.deepEqual(events.errors, [], 'but no error should reach the overlay');
+
+  runtime.dispose();
+});
+
 test('runtime forwards an injected stream to the generator', async () => {
   const { events, handlers } = collector();
   const seen = [];

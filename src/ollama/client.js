@@ -57,10 +57,15 @@ function createOllamaClient({
       historyTurns,
     });
 
-    // Passed through, not just checked in the loop below: breaking our own
-    // iteration would stop the overlay updating while the model kept
-    // generating and holding the GPU.
-    for await (const chunk of chat.stream(messages, { signal })) {
+    // `await` is required: LangChain's Runnable.stream() returns a Promise of
+    // an IterableReadableStream, not a directly async-iterable object.
+    //
+    // The signal is passed through, not merely checked in the loop below:
+    // breaking our own iteration would stop the overlay updating while the
+    // model kept generating and holding the GPU.
+    const chunks = await chat.stream(messages, { signal });
+
+    for await (const chunk of chunks) {
       if (signal?.aborted) return;
       const text = typeof chunk === 'string' ? chunk : (chunk?.content ?? '');
       if (text) yield text;
@@ -89,7 +94,36 @@ function createOllamaClient({
     }
   }
 
-  return { stream, probe };
+  /**
+   * Asks Ollama to load the model into VRAM without generating anything.
+   *
+   * Measured: a cold load of this 14 B model costs ~18 s, and Ollama performs
+   * it lazily inside whatever request arrives first. Left alone that is the
+   * operator's first question of the interview. An empty prompt is Ollama's
+   * documented load-only call, so the cost moves to app start.
+   *
+   * @returns {Promise<{ok: boolean, ms: number, error?: string}>}
+   */
+  async function warmup() {
+    const started = Date.now();
+    try {
+      const response = await fetchImpl(`${baseUrl.replace(/\/+$/, '')}/api/generate`, {
+        method: 'POST',
+        body: JSON.stringify({ model, prompt: '', keep_alive: keepAlive }),
+        // Generous: this is the cold load, and it is off the latency path.
+        signal: AbortSignal.timeout(120000),
+      });
+      if (!response.ok) {
+        return { ok: false, ms: Date.now() - started, error: `HTTP ${response.status}` };
+      }
+      await response.json();
+      return { ok: true, ms: Date.now() - started };
+    } catch (err) {
+      return { ok: false, ms: Date.now() - started, error: err.message };
+    }
+  }
+
+  return { stream, probe, warmup };
 }
 
 module.exports = { createOllamaClient };
