@@ -19,6 +19,7 @@ const { createSerialQueue } = require('../whisper/queue');
 const { createOllamaClient } = require('../ollama/client');
 const { createRetrievalClient } = require('../qdrant/client');
 const { createSettingsStore } = require('./settings-store');
+const { checkSetup } = require('./setup-check');
 
 const IS_DEV = !app.isPackaged || process.env.INVISIBLE_DEV === '1';
 const IS_WIN = process.platform === 'win32';
@@ -673,6 +674,29 @@ function registerIpc() {
   });
 
   ipcMain.on(CHANNELS.SETTINGS_OPEN, () => createSettingsWindow());
+
+  ipcMain.handle(CHANNELS.SETUP_CHECK, async () => {
+    // Fresh clients rather than the agent's: the agent may not have been
+    // constructed if the graph failed to load, and setup diagnosis is exactly
+    // when that is most likely.
+    const ollama = createOllamaClient({
+      baseUrl: config.agent.ollamaBaseUrl,
+      model: config.agent.model,
+    });
+    const retrieval = createRetrievalClient({
+      url: config.agent.qdrant.url,
+      collection: config.agent.qdrant.collection,
+      ollamaBaseUrl: config.agent.ollamaBaseUrl,
+      embedModel: config.agent.embedModel,
+    });
+
+    return checkSetup({
+      config,
+      root: path.join(__dirname, '..', '..'),
+      ollamaProbe: () => ollama.probe(),
+      qdrantProbe: () => retrieval.probe(),
+    });
+  });
 
   ipcMain.handle(CHANNELS.SETTINGS_GET, () => settings.get());
 

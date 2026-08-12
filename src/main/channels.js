@@ -26,6 +26,7 @@ const CHANNELS = {
   SETTINGS_GET: 'settings:get',
   SETTINGS_SET: 'settings:set',
   SETTINGS_RESET: 'settings:reset',
+  SETUP_CHECK: 'setup:check',
   // renderer -> main, fire and forget
   SETTINGS_OPEN: 'settings:open',
 
@@ -69,7 +70,12 @@ const OVERLAY_SEND = [
  * Separate from OVERLAY_SEND because these are ipcRenderer.invoke rather than
  * send, and the reachability invariant below must still account for them.
  */
-const RENDERER_INVOKE = [CHANNELS.SETTINGS_GET, CHANNELS.SETTINGS_SET, CHANNELS.SETTINGS_RESET];
+const RENDERER_INVOKE = [
+  CHANNELS.SETTINGS_GET,
+  CHANNELS.SETTINGS_SET,
+  CHANNELS.SETTINGS_RESET,
+  CHANNELS.SETUP_CHECK,
+];
 
 /** Channels the audio worker is allowed to send on. */
 const AUDIO_SEND = [

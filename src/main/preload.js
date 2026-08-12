@@ -55,6 +55,7 @@ contextBridge.exposeInMainWorld('invisible', {
     send(CHANNELS.OVERLAY_SET_INTERACTIVE, { interactive: Boolean(interactive) }),
 
   openSettings: () => send(CHANNELS.SETTINGS_OPEN),
+  checkSetup: () => invoke(CHANNELS.SETUP_CHECK),
   settings: {
     get: () => invoke(CHANNELS.SETTINGS_GET),
     set: (patch) => invoke(CHANNELS.SETTINGS_SET, patch),
