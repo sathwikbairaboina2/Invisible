@@ -28,6 +28,10 @@ function normalize(text) {
  */
 function createTriage({ fillerWords = DEFAULT_FILLER, minWords = 3 } = {}) {
   return async function triage(state) {
+    // The manual-ask shortcut is an explicit instruction from the operator and
+    // outranks every heuristic below, including the filler list.
+    if (state.forceRespond) return { shouldRespond: true };
+
     // The operator's own speech is recorded but never answered. Answering it
     // would make the overlay respond to the user talking to themselves.
     if (state.speaker !== 'remote') return { shouldRespond: false };

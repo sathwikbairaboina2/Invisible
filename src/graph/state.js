@@ -42,6 +42,9 @@ const AgentState = Annotation.Root({
   /** Set by the retriever when the vector store is unreachable. */
   retrievalError: Annotation(),
 
+  /** Set by the manual-ask shortcut to bypass triage for one turn. */
+  forceRespond: Annotation({ default: () => false }),
+
   /** Triage verdict. Drives the conditional edge. */
   shouldRespond: Annotation({ default: () => false }),
 

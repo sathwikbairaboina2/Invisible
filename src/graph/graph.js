@@ -40,4 +40,134 @@ function buildGraph(nodes) {
     .compile();
 }
 
-module.exports = { buildGraph };
+const { createTriage } = require('./nodes/triage');
+const { createTranscriber } = require('./nodes/transcriber');
+const { createRetriever } = require('./nodes/retriever');
+const { createGenerator } = require('./nodes/generator');
+
+let turnCounter = 0;
+
+/**
+ * The only surface the main process touches. Main knows nothing about
+ * LangGraph; the graph knows nothing about Electron.
+ *
+ * @param {{config?: object,
+ *          onTurnStart?: Function, onToken?: Function, onTurnEnd?: Function,
+ *          onTranscriptPartial?: Function, onTranscriptFinal?: Function,
+ *          onError?: Function}} options
+ */
+function createAgentRuntime(options = {}) {
+  const {
+    config = {},
+    onTurnStart,
+    onToken,
+    onTurnEnd,
+    onTranscriptFinal,
+    onError,
+  } = options;
+
+  const app = buildGraph({
+    transcriber: createTranscriber({ onTranscriptFinal }),
+    triage: createTriage({}),
+    retriever: createRetriever({ scoreThreshold: config?.qdrant?.scoreThreshold }),
+    generator: createGenerator({ onToken }),
+  });
+
+  /** Rolling transcript, owned here because each invoke() is stateless. */
+  let transcript = [];
+  /** @type {AbortController | null} */
+  let inFlight = null;
+  /** Last remote utterance, so the manual-ask shortcut has something to use. */
+  let lastRemoteUtterance = '';
+  let disposed = false;
+
+  function abortInFlight() {
+    if (inFlight && !inFlight.signal.aborted) inFlight.abort();
+  }
+
+  async function run({ speaker, pcm, sampleRate, utterance, forceRespond = false }) {
+    if (disposed) return;
+
+    // A new utterance always wins over one still generating.
+    abortInFlight();
+    const controller = new AbortController();
+    inFlight = controller;
+
+    const turnId = `turn-${++turnCounter}`;
+    let started = false;
+
+    try {
+      const result = await app.invoke(
+        {
+          turnId,
+          speaker,
+          pcm,
+          sampleRate,
+          utterance,
+          transcript,
+          forceRespond,
+        },
+        {
+          configurable: {
+            signal: controller.signal,
+            // Called by the generator, which only runs for turns that survived
+            // triage — so a discarded utterance never opens an overlay bubble.
+            announce: () => {
+              if (started) return;
+              started = true;
+              onTurnStart?.({ turnId, speaker });
+            },
+          },
+        }
+      );
+
+      transcript = result.transcript ?? transcript;
+      if (speaker === 'remote' && result.utterance) lastRemoteUtterance = result.utterance;
+
+      if (started) onTurnEnd?.({ turnId, aborted: controller.signal.aborted });
+    } catch (err) {
+      if (started) onTurnEnd?.({ turnId, aborted: true });
+      onError?.(err);
+    } finally {
+      // Only clear if this turn is still the current one; a turn that was
+      // superseded must not null out its successor's controller.
+      if (inFlight === controller) inFlight = null;
+    }
+  }
+
+  return {
+    submitUtterance: ({ speaker, pcm, sampleRate }) => run({ speaker, pcm, sampleRate }),
+
+    /** Manual-ask shortcut: re-run the last remote utterance, bypassing triage. */
+    ask: (question) => {
+      const text = question && question.trim() ? question.trim() : lastRemoteUtterance;
+      if (!text) return Promise.resolve();
+      // No pcm: the transcriber short-circuits and the utterance is reused, so
+      // the transcript is not appended to twice for one spoken sentence.
+      return run({
+        speaker: 'remote',
+        pcm: null,
+        sampleRate: 16000,
+        utterance: text,
+        forceRespond: true,
+      });
+    },
+
+    cancel: () => abortInFlight(),
+
+    clear: () => {
+      abortInFlight();
+      transcript = [];
+      lastRemoteUtterance = '';
+    },
+
+    transcriptLength: () => transcript.length,
+
+    dispose: () => {
+      abortInFlight();
+      disposed = true;
+    },
+  };
+}
+
+module.exports = { buildGraph, createAgentRuntime };

@@ -414,9 +414,15 @@ function initAgent() {
   return createAgentRuntime({
     config: config.agent,
     // Every emitter below is the single path from graph -> UI.
-    onTurnStart: (turn) => sendToOverlay(CHANNELS.AGENT_TURN_START, turn),
+    onTurnStart: (turn) => {
+      log('turn start', turn.turnId, turn.speaker);
+      sendToOverlay(CHANNELS.AGENT_TURN_START, turn);
+    },
     onToken: (turnId, token) => sendToOverlay(CHANNELS.AGENT_TOKEN, { turnId, token }),
-    onTurnEnd: (turn) => sendToOverlay(CHANNELS.AGENT_TURN_END, turn),
+    onTurnEnd: (turn) => {
+      log('turn end', turn.turnId, turn.aborted ? 'aborted' : 'complete');
+      sendToOverlay(CHANNELS.AGENT_TURN_END, turn);
+    },
     onTranscriptFinal: (seg) => sendToOverlay(CHANNELS.TRANSCRIPT_FINAL, seg),
     onTranscriptPartial: (seg) => sendToOverlay(CHANNELS.TRANSCRIPT_PARTIAL, seg),
     onError: (err) =>

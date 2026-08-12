@@ -112,3 +112,201 @@ test('buildGraph rejects a missing node', () => {
     /node "retriever" must be a function/
   );
 });
+
+test('forceRespond bypasses triage entirely', async () => {
+  // The manual-ask shortcut must reach the generator even for an utterance
+  // triage would otherwise discard as filler.
+  const out = await triage({ speaker: 'remote', utterance: 'okay', forceRespond: true });
+  assert.equal(out.shouldRespond, true);
+});
+
+// ---------------------------------------------------------------------------
+// Agent runtime
+// ---------------------------------------------------------------------------
+
+const { createAgentRuntime } = require('../src/graph/graph');
+
+/** Minimal stand-in for config.agent. */
+const TEST_CONFIG = { transcriptWindow: 40 };
+
+function collector() {
+  const events = { starts: [], tokens: [], ends: [], transcripts: [], errors: [] };
+  return {
+    events,
+    handlers: {
+      config: TEST_CONFIG,
+      onTurnStart: (t) => events.starts.push(t),
+      onToken: (turnId, token) => events.tokens.push({ turnId, token }),
+      onTurnEnd: (t) => events.ends.push(t),
+      onTranscriptFinal: (s) => events.transcripts.push(s),
+      onTranscriptPartial: () => {},
+      onError: (e) => events.errors.push(e),
+    },
+  };
+}
+
+const silence = () => new Float32Array(16000);
+
+/** Polls until `predicate` holds, so tests do not race a timed token stream. */
+async function waitFor(predicate, timeoutMs = 2000) {
+  const deadline = Date.now() + timeoutMs;
+  while (!predicate()) {
+    if (Date.now() > deadline) throw new Error('waitFor timed out');
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+}
+
+test('a remote utterance produces a streamed turn', async () => {
+  const { events, handlers } = collector();
+  const runtime = createAgentRuntime(handlers);
+
+  await runtime.submitUtterance({
+    speaker: 'remote',
+    pcm: silence(),
+    sampleRate: 16000,
+    durationMs: 1000,
+  });
+
+  assert.equal(events.starts.length, 1);
+  assert.ok(events.tokens.length > 1, 'expected more than one token');
+  assert.equal(events.ends.length, 1);
+  assert.equal(events.ends[0].aborted, false);
+  assert.equal(events.tokens[0].turnId, events.starts[0].turnId);
+  assert.equal(events.errors.length, 0);
+
+  runtime.dispose();
+});
+
+test("the operator's own speech produces transcript but no turn", async () => {
+  const { events, handlers } = collector();
+  const runtime = createAgentRuntime(handlers);
+
+  await runtime.submitUtterance({
+    speaker: 'user',
+    pcm: silence(),
+    sampleRate: 16000,
+    durationMs: 1000,
+  });
+
+  assert.equal(events.transcripts.length, 1);
+  assert.equal(events.transcripts[0].speaker, 'user');
+  assert.equal(events.starts.length, 0);
+  assert.equal(events.tokens.length, 0);
+
+  runtime.dispose();
+});
+
+test('cancel mid-stream ends the turn as aborted and truncates it', async () => {
+  const { events, handlers } = collector();
+  const runtime = createAgentRuntime(handlers);
+
+  const pending = runtime.submitUtterance({
+    speaker: 'remote',
+    pcm: silence(),
+    sampleRate: 16000,
+    durationMs: 1000,
+  });
+
+  // Cancel only once the stream is genuinely in flight; cancelling before the
+  // generator runs is a different case with no open bubble to close.
+  await waitFor(() => events.tokens.length > 0);
+  runtime.cancel();
+  await pending;
+
+  assert.equal(events.ends.length, 1);
+  assert.equal(events.ends[0].aborted, true);
+  assert.ok(events.tokens.length < 12, 'cancel should have truncated the stub stream');
+
+  runtime.dispose();
+});
+
+test('a new utterance aborts the turn still generating', async () => {
+  const { events, handlers } = collector();
+  const runtime = createAgentRuntime(handlers);
+
+  const first = runtime.submitUtterance({
+    speaker: 'remote',
+    pcm: silence(),
+    sampleRate: 16000,
+    durationMs: 1000,
+  });
+  await waitFor(() => events.tokens.length > 0);
+
+  const second = runtime.submitUtterance({
+    speaker: 'remote',
+    pcm: silence(),
+    sampleRate: 16000,
+    durationMs: 1000,
+  });
+  await Promise.all([first, second]);
+
+  assert.equal(events.starts.length, 2, 'both turns should have announced');
+  assert.equal(events.ends.length, 2);
+  assert.equal(events.ends[0].aborted, true, 'first turn should be aborted');
+  assert.equal(events.ends[1].aborted, false, 'second turn should complete');
+  assert.notEqual(events.starts[0].turnId, events.starts[1].turnId);
+
+  runtime.dispose();
+});
+
+test('clear empties the transcript history', async () => {
+  const { handlers } = collector();
+  const runtime = createAgentRuntime(handlers);
+
+  await runtime.submitUtterance({
+    speaker: 'remote',
+    pcm: silence(),
+    sampleRate: 16000,
+    durationMs: 1000,
+  });
+  assert.ok(runtime.transcriptLength() > 0);
+
+  runtime.clear();
+  assert.equal(runtime.transcriptLength(), 0);
+
+  runtime.dispose();
+});
+
+test('ask re-runs the last remote utterance without re-transcribing', async () => {
+  const { events, handlers } = collector();
+  const runtime = createAgentRuntime(handlers);
+
+  await runtime.submitUtterance({
+    speaker: 'remote',
+    pcm: silence(),
+    sampleRate: 16000,
+    durationMs: 1000,
+  });
+  const transcriptsAfterFirst = events.transcripts.length;
+  const spoken = events.transcripts[0].text;
+
+  await runtime.ask();
+
+  assert.equal(events.starts.length, 2);
+  // The re-run carries no audio, so it must not append a second transcript
+  // line for the same utterance.
+  assert.equal(events.transcripts.length, transcriptsAfterFirst);
+  // Tokens arrive word by word, so assert against the reassembled stream.
+  const streamed = events.tokens.map((t) => t.token).join('');
+  assert.ok(
+    streamed.includes(spoken),
+    'the re-run should have generated against the original utterance'
+  );
+
+  runtime.dispose();
+});
+
+test('dispose stops the runtime accepting new work', async () => {
+  const { events, handlers } = collector();
+  const runtime = createAgentRuntime(handlers);
+  runtime.dispose();
+
+  await runtime.submitUtterance({
+    speaker: 'remote',
+    pcm: silence(),
+    sampleRate: 16000,
+    durationMs: 1000,
+  });
+
+  assert.equal(events.starts.length, 0);
+});
