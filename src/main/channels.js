@@ -22,6 +22,13 @@ const CHANNELS = {
   AGENT_ASK: 'agent:ask',
   OVERLAY_SET_INTERACTIVE: 'overlay:set-interactive',
 
+  // renderer -> main, request/response via invoke/handle
+  SETTINGS_GET: 'settings:get',
+  SETTINGS_SET: 'settings:set',
+  SETTINGS_RESET: 'settings:reset',
+  // renderer -> main, fire and forget
+  SETTINGS_OPEN: 'settings:open',
+
   // main -> audio worker
   AUDIO_START: 'audio:start',
   AUDIO_STOP: 'audio:stop',
@@ -53,7 +60,16 @@ const OVERLAY_SEND = [
   CHANNELS.AGENT_CLEAR,
   CHANNELS.AGENT_ASK,
   CHANNELS.OVERLAY_SET_INTERACTIVE,
+  CHANNELS.SETTINGS_OPEN,
 ];
+
+/**
+ * Channels a renderer may invoke and receive a reply on.
+ *
+ * Separate from OVERLAY_SEND because these are ipcRenderer.invoke rather than
+ * send, and the reachability invariant below must still account for them.
+ */
+const RENDERER_INVOKE = [CHANNELS.SETTINGS_GET, CHANNELS.SETTINGS_SET, CHANNELS.SETTINGS_RESET];
 
 /** Channels the audio worker is allowed to send on. */
 const AUDIO_SEND = [
@@ -67,4 +83,11 @@ const AUDIO_SEND = [
 /** Channels the audio worker is allowed to listen on. */
 const AUDIO_LISTEN = [CHANNELS.AUDIO_START, CHANNELS.AUDIO_STOP];
 
-module.exports = { CHANNELS, RENDERER_LISTEN, OVERLAY_SEND, AUDIO_SEND, AUDIO_LISTEN };
+module.exports = {
+  CHANNELS,
+  RENDERER_LISTEN,
+  OVERLAY_SEND,
+  RENDERER_INVOKE,
+  AUDIO_SEND,
+  AUDIO_LISTEN,
+};

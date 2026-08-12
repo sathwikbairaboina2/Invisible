@@ -7,12 +7,13 @@ const {
   CHANNELS,
   RENDERER_LISTEN,
   OVERLAY_SEND,
+  RENDERER_INVOKE,
   AUDIO_SEND,
   AUDIO_LISTEN,
 } = require('../src/main/channels');
 
 const ALL = Object.values(CHANNELS);
-const LISTS = { RENDERER_LISTEN, OVERLAY_SEND, AUDIO_SEND, AUDIO_LISTEN };
+const LISTS = { RENDERER_LISTEN, OVERLAY_SEND, RENDERER_INVOKE, AUDIO_SEND, AUDIO_LISTEN };
 
 test('every channel name is unique', () => {
   assert.equal(new Set(ALL).size, ALL.length, 'duplicate channel string in CHANNELS');
@@ -44,7 +45,13 @@ test('send and listen lists do not overlap within a renderer', () => {
 });
 
 test('every channel is reachable from at least one allow-list', () => {
-  const reachable = new Set([...RENDERER_LISTEN, ...OVERLAY_SEND, ...AUDIO_SEND, ...AUDIO_LISTEN]);
+  const reachable = new Set([
+    ...RENDERER_LISTEN,
+    ...OVERLAY_SEND,
+    ...RENDERER_INVOKE,
+    ...AUDIO_SEND,
+    ...AUDIO_LISTEN,
+  ]);
   const orphans = ALL.filter((c) => !reachable.has(c));
   assert.deepEqual(orphans, [], `channels declared but wired to nobody: ${orphans.join(', ')}`);
 });

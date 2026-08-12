@@ -1,7 +1,7 @@
 'use strict';
 
 const { contextBridge, ipcRenderer } = require('electron');
-const { CHANNELS, RENDERER_LISTEN, OVERLAY_SEND } = require('./channels');
+const { CHANNELS, RENDERER_LISTEN, OVERLAY_SEND, RENDERER_INVOKE } = require('./channels');
 
 /**
  * Subscribes to a main-process channel. The IpcRendererEvent is deliberately
@@ -29,6 +29,14 @@ function send(channel, payload) {
   ipcRenderer.send(channel, payload);
 }
 
+/** Request/response, unlike send. Returns whatever the main handler returns. */
+function invoke(channel, payload) {
+  if (!RENDERER_INVOKE.includes(channel)) {
+    throw new Error(`preload: refusing to invoke unlisted channel "${channel}"`);
+  }
+  return ipcRenderer.invoke(channel, payload);
+}
+
 contextBridge.exposeInMainWorld('invisible', {
   onTurnStart: (fn) => subscribe(CHANNELS.AGENT_TURN_START, fn),
   onToken: (fn) => subscribe(CHANNELS.AGENT_TOKEN, fn),
@@ -45,4 +53,11 @@ contextBridge.exposeInMainWorld('invisible', {
   ask: (question) => send(CHANNELS.AGENT_ASK, { question: String(question ?? '') }),
   setInteractive: (interactive) =>
     send(CHANNELS.OVERLAY_SET_INTERACTIVE, { interactive: Boolean(interactive) }),
+
+  openSettings: () => send(CHANNELS.SETTINGS_OPEN),
+  settings: {
+    get: () => invoke(CHANNELS.SETTINGS_GET),
+    set: (patch) => invoke(CHANNELS.SETTINGS_SET, patch),
+    reset: () => invoke(CHANNELS.SETTINGS_RESET),
+  },
 });

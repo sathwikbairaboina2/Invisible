@@ -18,6 +18,7 @@ const { createWhisperClient } = require('../whisper/client');
 const { createSerialQueue } = require('../whisper/queue');
 const { createOllamaClient } = require('../ollama/client');
 const { createRetrievalClient } = require('../qdrant/client');
+const { createSettingsStore } = require('./settings-store');
 
 const IS_DEV = !app.isPackaged || process.env.INVISIBLE_DEV === '1';
 const IS_WIN = process.platform === 'win32';
@@ -49,6 +50,8 @@ let audioWin = null;
 let agent = null;
 /** @type {ReturnType<typeof createSidecar> | null} */
 let sidecar = null;
+/** @type {ReturnType<typeof createSettingsStore> | null} */
+let settings = null;
 
 const state = {
   visible: true,
@@ -615,6 +618,20 @@ function registerIpc() {
     }
   });
 
+  ipcMain.handle(CHANNELS.SETTINGS_GET, () => settings.get());
+
+  ipcMain.handle(CHANNELS.SETTINGS_SET, (_event, patch) => {
+    // Returned rather than thrown: a rejected promise across the bridge loses
+    // the message, and the message is the whole point of validation.
+    try {
+      return { ok: true, settings: settings.set(patch) };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  });
+
+  ipcMain.handle(CHANNELS.SETTINGS_RESET, () => ({ ok: true, settings: settings.reset() }));
+
   ipcMain.on(CHANNELS.AGENT_CANCEL, () => agent?.cancel());
   ipcMain.on(CHANNELS.AGENT_CLEAR, () => clearContext());
 
@@ -689,6 +706,11 @@ if (!app.requestSingleInstanceLock()) {
 
   app.whenReady().then(() => {
     if (IS_MAC) app.dock?.hide();
+
+    settings = createSettingsStore({
+      defaults: config,
+      filePath: path.join(app.getPath('userData'), 'settings.json'),
+    });
 
     configureSession();
     createOverlayWindow();
