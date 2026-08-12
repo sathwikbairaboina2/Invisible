@@ -13,6 +13,10 @@ bin/
 *.wav
 *.pcm
 
+# Copied out of node_modules by scripts/copy-vendor.js. Regenerate with
+# `npm run vendor`; never commit.
+src/audio/vendor/
+
 .env
 .env.local
 *.log

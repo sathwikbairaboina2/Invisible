@@ -5,6 +5,11 @@
     <title>invisible-audio</title>
   </head>
   <body>
+    <!-- bundle.min.js has ONNX Runtime compiled in and does not read a global
+         `ort`, so there is deliberately no separate ORT script tag here. It
+         fetches its worklet, the Silero model, and the ORT wasm glue at runtime
+         from the paths configured in audio-worker.js. -->
+    <script src="./vendor/vad/bundle.min.js"></script>
     <script src="./audio-worker.js"></script>
   </body>
 </html>

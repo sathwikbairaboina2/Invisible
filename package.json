@@ -7,7 +7,9 @@
   "scripts": {
     "start": "electron .",
     "dev": "cross-env INVISIBLE_DEV=1 electron .",
-    "test": "node --test \"test/**/*.test.js\""
+    "test": "node --test \"test/**/*.test.js\"",
+    "vendor": "node scripts/copy-vendor.js",
+    "postinstall": "node scripts/copy-vendor.js"
   },
   "engines": {
     "node": ">=24"
@@ -16,7 +18,9 @@
     "@langchain/core": "^0.3.40",
     "@langchain/langgraph": "^0.2.44",
     "@langchain/ollama": "^0.1.5",
-    "@qdrant/js-client-rest": "^1.13.0"
+    "@qdrant/js-client-rest": "^1.13.0",
+    "@ricky0123/vad-web": "^0.0.30",
+    "onnxruntime-web": "^1.27.0"
   },
   "devDependencies": {
     "cross-env": "^7.0.3",
