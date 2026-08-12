@@ -1,0 +1,18 @@
+node_modules/
+dist/
+out/
+.vite/
+
+# Local model weights and the whisper.cpp sidecar binary — fetched at setup,
+# never committed.
+models/
+bin/
+
+# Nothing in this project should ever produce an audio artifact. If one appears
+# here it is a bug, not a file to commit.
+*.wav
+*.pcm
+
+.env
+.env.local
+*.log

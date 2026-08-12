@@ -1,0 +1,21 @@
+{
+  "name": "invisible",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local-first, screen-capture-excluded meeting overlay assistant.",
+  "main": "src/main/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "cross-env INVISIBLE_DEV=1 electron ."
+  },
+  "dependencies": {
+    "@langchain/core": "^0.3.40",
+    "@langchain/langgraph": "^0.2.44",
+    "@langchain/ollama": "^0.1.5",
+    "@qdrant/js-client-rest": "^1.13.0"
+  },
+  "devDependencies": {
+    "cross-env": "^7.0.3",
+    "electron": "^33.2.0"
+  }
+}
