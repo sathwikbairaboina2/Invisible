@@ -6,7 +6,9 @@
   "main": "src/main/main.js",
   "scripts": {
     "start": "electron .",
-    "dev": "cross-env INVISIBLE_DEV=1 electron .",
+    "dev": "npm run ui:build && cross-env INVISIBLE_DEV=1 electron .",
+    "ui:build": "vite build",
+    "ui:watch": "vite build --watch",
     "test": "node --test \"test/**/*.test.js\"",
     "vendor": "node scripts/copy-vendor.js",
     "fetch-whisper": "node scripts/fetch-whisper.js",
@@ -26,11 +28,15 @@
     "@langchain/ollama": "^0.1.5",
     "@qdrant/js-client-rest": "^1.13.0",
     "@ricky0123/vad-web": "^0.0.30",
-    "onnxruntime-web": "^1.27.0"
+    "onnxruntime-web": "^1.27.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
   },
   "devDependencies": {
+    "@vitejs/plugin-react": "^6.0.5",
     "cross-env": "^7.0.3",
-    "electron": "^43.4.0"
+    "electron": "^43.4.0",
+    "vite": "^8.2.1"
   },
   "allowScripts": {
     "electron@43.4.0": true

@@ -232,6 +232,19 @@ function createOverlayWindow() {
   screen.on('display-added', () => applyStealth(overlayWin));
   screen.on('display-removed', () => applyStealth(overlayWin));
 
+  // The overlay is click-through and non-focusable, so reaching its DevTools
+  // means first toggling interactive mode. A React render error would
+  // otherwise show up as a silently blank panel.
+  if (IS_DEV) {
+    overlayWin.webContents.on('console-message', (event) => {
+      const level = ['debug', 'info', 'warning', 'error'][event.level] ?? event.level;
+      log(`overlay[${level}] ${event.message} (${event.sourceId}:${event.lineNumber})`);
+    });
+    overlayWin.webContents.on('render-process-gone', (_e, details) => {
+      log('overlay process gone:', details.reason);
+    });
+  }
+
   // Nothing in this window should ever navigate or open a browser window.
   overlayWin.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   overlayWin.webContents.on('will-navigate', (e) => e.preventDefault());
@@ -240,7 +253,7 @@ function createOverlayWindow() {
     overlayWin = null;
   });
 
-  overlayWin.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
+  overlayWin.loadFile(path.join(__dirname, '..', 'renderer', 'dist', 'index.html'));
 
   overlayWin.once('ready-to-show', () => {
     if (state.visible) overlayWin.showInactive();
@@ -575,7 +588,13 @@ function initAgent() {
 function registerIpc() {
   // --- overlay renderer -> main -------------------------------------------
   ipcMain.on(CHANNELS.OVERLAY_READY, (event) => {
-    if (overlayWin && event.sender === overlayWin.webContents) pushStatus({});
+    if (overlayWin && event.sender === overlayWin.webContents) {
+      // Proves the renderer mounted and the bridge is live. Without it, a
+      // renderer that failed to boot looks identical to one that is simply
+      // idle, because every other log line comes from main.
+      log('overlay ready');
+      pushStatus({});
+    }
   });
 
   ipcMain.on(CHANNELS.AGENT_CANCEL, () => agent?.cancel());

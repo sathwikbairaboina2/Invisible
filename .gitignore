@@ -23,6 +23,9 @@ src/audio/vendor/
 corpus/*
 !corpus/README.md
 
+# Vite renderer build output. Regenerate with `npm run ui:build`.
+src/renderer/dist/
+
 .env
 .env.local
 *.log
