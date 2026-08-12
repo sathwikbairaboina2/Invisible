@@ -1,10 +1,11 @@
-# Ollama for Invisible, deliberately separate from any other project's stack.
+# Local services for Invisible, deliberately separate from any other project's
+# stack.
 #
-# Two existing containers on this machine (avatara-backend, marketplace) both
-# run Ollama, both bind host port 11434, and both were created without GPU
-# access. Reusing either would tie this app's runtime to another project's
-# compose lifecycle and would run a 14B model on CPU at roughly 2-3 tokens per
-# second. Hence: own service, own volume, own port.
+# Two other containers on this machine (avatara-backend, marketplace) both run
+# Ollama, both bind host port 11434, and both were created without GPU access.
+# Reusing either would tie this app's runtime to another project's compose
+# lifecycle and would run a 14B model on CPU at roughly 2-3 tokens per second.
+# Hence: own services, own volumes, own ports.
 
 name: invisible
 
@@ -36,5 +37,18 @@ services:
               count: all
               capabilities: [gpu]
 
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: invisible-qdrant
+    restart: unless-stopped
+    ports:
+      # 6333 is free on this machine. Bound to loopback: the corpus is a
+      # résumé and prepared interview answers, and nothing about it should be
+      # reachable from the network.
+      - "127.0.0.1:6333:6333"
+    volumes:
+      - invisible-qdrant-storage:/qdrant/storage
+
 volumes:
   invisible-ollama-models:
+  invisible-qdrant-storage:

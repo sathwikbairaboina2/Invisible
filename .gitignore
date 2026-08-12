@@ -17,6 +17,12 @@ bin/
 # `npm run vendor`; never commit.
 src/audio/vendor/
 
+# The operator's résumé, project write-ups, and prepared interview answers.
+# Personal data: never commit. The directory's README is tracked, its contents
+# are not.
+corpus/*
+!corpus/README.md
+
 .env
 .env.local
 *.log
