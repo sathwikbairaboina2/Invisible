@@ -24,12 +24,19 @@ function createGenerator({ stream, onToken, tokenDelayMs = 35 } = {}) {
   }
 
   return async function generator(state, runtimeConfig) {
+    const signal = runtimeConfig?.configurable?.signal;
+    const turnId = state.turnId;
+
+    // Checked before announcing, not after. Transcription does not honour the
+    // abort signal — losing a transcript line is worse than a wasted turn — so
+    // a superseded turn still arrives here, and announcing would open an
+    // overlay bubble that is closed again on the very next line.
+    if (signal?.aborted) return { response: '' };
+
     // Announced here rather than at turn start: a turn that triage rejects
     // never reaches this node, and must not open an empty bubble.
     runtimeConfig?.configurable?.announce?.();
 
-    const signal = runtimeConfig?.configurable?.signal;
-    const turnId = state.turnId;
     const source = stream ? stream(state, signal) : stubStream(state, signal);
 
     let accumulated = '';

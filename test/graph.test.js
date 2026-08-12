@@ -310,3 +310,103 @@ test('dispose stops the runtime accepting new work', async () => {
 
   assert.equal(events.starts.length, 0);
 });
+
+// ---------------------------------------------------------------------------
+// Phase 2: real STT changes the abort boundary
+// ---------------------------------------------------------------------------
+
+test('a turn aborted before generation never announces', async () => {
+  // With real STT, transcription takes hundreds of milliseconds and does not
+  // honour the abort signal. A turn superseded during transcription therefore
+  // still reaches the generator — and must not open an overlay bubble it will
+  // immediately close.
+  const { createGenerator } = require('../src/graph/nodes/generator');
+
+  let announced = false;
+  const tokens = [];
+  const controller = new AbortController();
+  controller.abort();
+
+  const generator = createGenerator({ onToken: (_id, t) => tokens.push(t) });
+  const result = await generator(
+    { turnId: 'turn-x', utterance: 'anything' },
+    { configurable: { signal: controller.signal, announce: () => (announced = true) } }
+  );
+
+  assert.equal(announced, false, 'an already-aborted turn must not announce');
+  assert.equal(tokens.length, 0);
+  assert.equal(result.response, '');
+});
+
+test('runtime forwards an injected transcribe to the transcriber', async () => {
+  const { events, handlers } = collector();
+  const calls = [];
+
+  const runtime = createAgentRuntime({
+    ...handlers,
+    transcribe: async (pcm, sampleRate) => {
+      calls.push({ length: pcm.length, sampleRate });
+      return 'Injected transcript from the fake recogniser.';
+    },
+  });
+
+  await runtime.submitUtterance({
+    speaker: 'remote',
+    pcm: silence(),
+    sampleRate: 16000,
+    durationMs: 1000,
+  });
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].length, 16000);
+  assert.equal(calls[0].sampleRate, 16000);
+  assert.equal(events.transcripts[0].text, 'Injected transcript from the fake recogniser.');
+
+  runtime.dispose();
+});
+
+test('a transcriber failure surfaces as an error without killing the runtime', async () => {
+  const { events, handlers } = collector();
+
+  const runtime = createAgentRuntime({
+    ...handlers,
+    transcribe: async () => {
+      throw new Error('whisper: fetch failed');
+    },
+  });
+
+  await runtime.submitUtterance({
+    speaker: 'remote',
+    pcm: silence(),
+    sampleRate: 16000,
+    durationMs: 1000,
+  });
+
+  assert.equal(events.errors.length, 1);
+  assert.match(events.errors[0].message, /whisper: fetch failed/);
+  assert.equal(events.starts.length, 0, 'a failed transcription must not open a bubble');
+
+  runtime.dispose();
+});
+
+test('an empty transcript produces no transcript line and no turn', async () => {
+  // whisper returns '' for a cough that got past the VAD.
+  const { events, handlers } = collector();
+
+  const runtime = createAgentRuntime({
+    ...handlers,
+    transcribe: async () => '',
+  });
+
+  await runtime.submitUtterance({
+    speaker: 'remote',
+    pcm: silence(),
+    sampleRate: 16000,
+    durationMs: 1000,
+  });
+
+  assert.equal(events.transcripts.length, 0);
+  assert.equal(events.starts.length, 0);
+
+  runtime.dispose();
+});

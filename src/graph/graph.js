@@ -59,6 +59,7 @@ let turnCounter = 0;
 function createAgentRuntime(options = {}) {
   const {
     config = {},
+    transcribe,
     onTurnStart,
     onToken,
     onTurnEnd,
@@ -67,7 +68,8 @@ function createAgentRuntime(options = {}) {
   } = options;
 
   const app = buildGraph({
-    transcriber: createTranscriber({ onTranscriptFinal }),
+    // Absent, createTranscriber falls back to its Phase 1 stub.
+    transcriber: createTranscriber({ transcribe, onTranscriptFinal }),
     triage: createTriage({}),
     retriever: createRetriever({ scoreThreshold: config?.qdrant?.scoreThreshold }),
     generator: createGenerator({ onToken }),

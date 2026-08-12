@@ -23,6 +23,13 @@ function createTranscriber({ transcribe, onTranscriptFinal } = {}) {
 
     const text = (await recognise(state.pcm, state.sampleRate ?? 16000)).trim();
 
+    // whisper returns '' for audio it judged non-speech — a cough or a door
+    // that got past the VAD. Emitting it would put a blank line in the
+    // transcript and hand triage an empty utterance to reason about.
+    if (text.length === 0) {
+      return { utterance: '', pcm: null };
+    }
+
     // The transcript is emitted regardless of the triage verdict that follows,
     // so the operator always sees the whole conversation.
     onTranscriptFinal?.({ speaker: state.speaker, text });
