@@ -6,7 +6,11 @@
   "main": "src/main/main.js",
   "scripts": {
     "start": "electron .",
-    "dev": "cross-env INVISIBLE_DEV=1 electron ."
+    "dev": "cross-env INVISIBLE_DEV=1 electron .",
+    "test": "node --test \"test/**/*.test.js\""
+  },
+  "engines": {
+    "node": ">=24"
   },
   "dependencies": {
     "@langchain/core": "^0.3.40",
