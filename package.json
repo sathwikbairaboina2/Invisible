@@ -9,6 +9,7 @@
     "dev": "cross-env INVISIBLE_DEV=1 electron .",
     "test": "node --test \"test/**/*.test.js\"",
     "vendor": "node scripts/copy-vendor.js",
+    "fetch-whisper": "node scripts/fetch-whisper.js",
     "postinstall": "node scripts/copy-vendor.js"
   },
   "engines": {
