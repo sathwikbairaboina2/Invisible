@@ -40,6 +40,31 @@ module.exports = {
     maxUtteranceMs: 30000,
   },
 
+  whisper: {
+    /** Relative to the project root; populated by `npm run fetch-whisper`. */
+    binary: 'bin/whisper-server.exe',
+    model: 'models/ggml-large-v3-turbo.bin',
+    host: '127.0.0.1',
+    /** Chosen to avoid the usual 8080/3000 collisions. */
+    port: 8178,
+    /** whisper.cpp threads. The GPU does the work; these feed it. */
+    threads: 8,
+    language: 'en',
+    /** Loading 1.6 GB onto the GPU is not instant on a cold filesystem cache. */
+    startupTimeoutMs: 90000,
+    /** Per-utterance HTTP timeout. */
+    requestTimeoutMs: 30000,
+    /** Restart attempts after an unexpected exit, before giving up. */
+    maxRestarts: 3,
+    /**
+     * Utterances allowed to wait for the single model instance. Beyond this the
+     * oldest is dropped and counted — a backlog that keeps growing means the
+     * overlay is answering questions from a minute ago, which is worse than
+     * missing one.
+     */
+    maxQueueDepth: 8,
+  },
+
   agent: {
     ollamaBaseUrl: process.env.OLLAMA_HOST || 'http://127.0.0.1:11434',
     model: process.env.INVISIBLE_MODEL || 'qwen2.5-coder:14b-instruct-q4_K_M',
