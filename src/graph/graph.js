@@ -60,6 +60,7 @@ function createAgentRuntime(options = {}) {
   const {
     config = {},
     transcribe,
+    stream,
     onTurnStart,
     onToken,
     onTurnEnd,
@@ -72,7 +73,8 @@ function createAgentRuntime(options = {}) {
     transcriber: createTranscriber({ transcribe, onTranscriptFinal }),
     triage: createTriage({}),
     retriever: createRetriever({ scoreThreshold: config?.qdrant?.scoreThreshold }),
-    generator: createGenerator({ onToken }),
+    // Absent, createGenerator falls back to its Phase 1 stub stream.
+    generator: createGenerator({ stream, onToken }),
   });
 
   /** Rolling transcript, owned here because each invoke() is stateless. */

@@ -389,6 +389,35 @@ test('a transcriber failure surfaces as an error without killing the runtime', a
   runtime.dispose();
 });
 
+test('runtime forwards an injected stream to the generator', async () => {
+  const { events, handlers } = collector();
+  const seen = [];
+
+  const runtime = createAgentRuntime({
+    ...handlers,
+    transcribe: async () => 'How would you rate limit an API?',
+    stream: async function* (state) {
+      seen.push(state.utterance);
+      yield 'Token bucket. ';
+      yield '• Redis INCR + EXPIRE';
+    },
+  });
+
+  await runtime.submitUtterance({
+    speaker: 'remote',
+    pcm: silence(),
+    sampleRate: 16000,
+    durationMs: 1000,
+  });
+
+  assert.deepEqual(seen, ['How would you rate limit an API?']);
+  const streamed = events.tokens.map((t) => t.token).join('');
+  assert.equal(streamed, 'Token bucket. • Redis INCR + EXPIRE');
+  assert.equal(events.ends[0].aborted, false);
+
+  runtime.dispose();
+});
+
 test('an empty transcript produces no transcript line and no turn', async () => {
   // whisper returns '' for a cough that got past the VAD.
   const { events, handlers } = collector();
