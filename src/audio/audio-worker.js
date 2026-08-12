@@ -3,13 +3,180 @@
 (function () {
   const api = window.invisibleAudio;
 
-  api.onStart(() => {
-    // Real capture arrives in Task 4. Reporting readiness now proves the
-    // main -> worker -> main IPC round trip before any media API is involved.
+  /**
+   * Absolute file:// URLs for the vendored assets.
+   *
+   * These must not be page-relative. `baseAssetPath` is resolved by the VAD
+   * bundle relative to its own script location, and `onnxWASMBasePath` is
+   * handed to ONNX Runtime, which resolves it the same way — so a page-relative
+   * './vendor/ort/' becomes 'vendor/vad/vendor/ort/' and 404s. Absolute URLs
+   * are unambiguous for both consumers.
+   */
+  const ASSETS = {
+    vad: new URL('./vendor/vad/', window.location.href).href,
+    ort: new URL('./vendor/ort/', window.location.href).href,
+  };
+
+  /** Running chains, keyed by speaker tag. */
+  const chains = new Map();
+  /** @type {AudioContext | null} */
+  let ctx = null;
+  /** @type {number | null} */
+  let meterTimer = null;
+
+  /**
+   * One AudioContext shared by both chains.
+   *
+   * Requesting 16 kHz makes Chromium resample every MediaStreamSource with a
+   * proper anti-alias filter, which is the rate Whisper and Silero both expect.
+   * Doing it here removes any need for a hand-written resampler.
+   */
+  function audioContext() {
+    if (!ctx) ctx = new AudioContext({ sampleRate: 16000 });
+    return ctx;
+  }
+
+  /**
+   * Options for one MicVAD instance.
+   *
+   * MicVAD is the only real-time class @ricky0123/vad-web@0.0.30 exports, but
+   * its `getStream` hook means it is not tied to the microphone: handing it an
+   * already-acquired stream is how the loopback chain reuses the same class.
+   * `audioContext` is passed so both chains share one context — MicVAD then
+   * treats the context as borrowed and will not close it on destroy().
+   */
+  function vadOptions(cfg, speaker, context, stream) {
+    return {
+      audioContext: context,
+      getStream: async () => stream,
+      // The stream's lifetime is owned by this module, not by MicVAD.
+      pauseStream: async () => {},
+      resumeStream: async () => stream,
+      startOnLoad: true,
+      processorType: 'AudioWorklet',
+
+      model: cfg.model,
+      // Absolute; see ASSETS. Trailing slashes are required by both consumers.
+      baseAssetPath: ASSETS.vad,
+      onnxWASMBasePath: ASSETS.ort,
+
+      positiveSpeechThreshold: cfg.vad.positiveSpeechThreshold,
+      negativeSpeechThreshold: cfg.vad.negativeSpeechThreshold,
+      redemptionMs: cfg.vad.redemptionMs,
+      minSpeechMs: cfg.vad.minSpeechMs,
+      preSpeechPadMs: cfg.vad.preSpeechPadMs,
+      // Pausing must not manufacture a half-utterance.
+      submitUserSpeechOnPause: false,
+
+      onSpeechStart: () => api.speechStart(speaker),
+
+      /** @param {Float32Array} audio mono, 16 kHz, samples in [-1, 1] */
+      onSpeechEnd: (audio) => {
+        const maxSamples = Math.round((cfg.maxUtteranceMs / 1000) * cfg.sampleRate);
+        const clipped = audio.length > maxSamples ? audio.subarray(0, maxSamples) : audio;
+        // subarray shares the parent buffer, so copy before handing the buffer
+        // across the bridge — otherwise the receiver sees the whole recording.
+        const pcm = new Float32Array(clipped);
+
+        api.utterance({
+          speaker,
+          pcm: pcm.buffer,
+          sampleRate: cfg.sampleRate,
+          durationMs: Math.round((pcm.length / cfg.sampleRate) * 1000),
+        });
+      },
+
+      // Speech that never reached minSpeechMs — a cough, a keystroke.
+      onVADMisfire: () => {},
+    };
+  }
+
+  /**
+   * MicVAD builds its own MediaStreamSource internally, so this taps the same
+   * stream a second time purely to drive the level meter. Two source nodes off
+   * one stream is fine; they are independent readers.
+   */
+  function attachMeter(context, stream) {
+    const source = context.createMediaStreamSource(stream);
+    const analyser = context.createAnalyser();
+    analyser.fftSize = 512;
+    source.connect(analyser);
+    return { source, analyser, buf: new Float32Array(analyser.fftSize) };
+  }
+
+  async function startChain({ speaker, stream, cfg }) {
+    const context = audioContext();
+    if (context.state === 'suspended') await context.resume();
+
+    const meter = attachMeter(context, stream);
+    const node = await window.vad.MicVAD.new(vadOptions(cfg, speaker, context, stream));
+    await node.start();
+
+    chains.set(speaker, { stream, node, ...meter });
+  }
+
+  function startMeters() {
+    if (meterTimer !== null) return;
+    meterTimer = setInterval(() => {
+      for (const [speaker, chain] of chains) {
+        chain.analyser.getFloatTimeDomainData(chain.buf);
+        let sum = 0;
+        for (let i = 0; i < chain.buf.length; i++) sum += chain.buf[i] * chain.buf[i];
+        const rms = Math.sqrt(sum / chain.buf.length);
+        api.level(speaker, Math.min(1, rms * 4));
+      }
+    }, 120);
+  }
+
+  async function stopAll() {
+    if (meterTimer !== null) {
+      clearInterval(meterTimer);
+      meterTimer = null;
+    }
+    for (const chain of chains.values()) {
+      try {
+        await chain.node.destroy();
+      } catch (_) {
+        /* already torn down */
+      }
+      chain.source.disconnect();
+      for (const track of chain.stream.getTracks()) track.stop();
+    }
+    chains.clear();
+  }
+
+  api.onStart(async (payload) => {
+    const cfg = payload && payload.audio;
+    if (!cfg) {
+      api.error('audio:start arrived without a config payload');
+      return;
+    }
+
+    try {
+      const mic = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          channelCount: 1,
+        },
+        video: false,
+      });
+      await startChain({ speaker: 'user', stream: mic, cfg });
+    } catch (err) {
+      api.error(`microphone unavailable: ${err.message}`);
+      return;
+    }
+
+    startMeters();
     api.ready();
   });
 
   api.onStop(() => {
-    /* no capture to stop yet */
+    stopAll();
+  });
+
+  window.addEventListener('beforeunload', () => {
+    stopAll();
   });
 })();

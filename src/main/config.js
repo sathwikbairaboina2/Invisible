@@ -14,20 +14,27 @@ module.exports = {
   },
 
   audio: {
-    /** Whisper wants 16 kHz mono PCM. Resampling happens in the worker. */
+    /** Whisper wants 16 kHz mono PCM. Requesting this rate on the AudioContext
+     *  makes Chromium resample every source with a proper anti-alias filter. */
     sampleRate: 16000,
-    /** Audio worklet frame size. 128 is the Web Audio quantum. */
-    frameSize: 128,
-    /** Silero VAD thresholds. */
+
+    /** Silero model. 'v5' is more accurate than the package default, 'legacy'. */
+    model: 'v5',
+
+    /**
+     * Silero VAD tuning. @ricky0123/vad-web 0.0.30 takes milliseconds, not
+     * frame counts. One v5 frame is 512 samples at 16 kHz = 32 ms, so the
+     * frame-count values these were derived from are 12 / 6 / 6.
+     */
     vad: {
       positiveSpeechThreshold: 0.55,
       negativeSpeechThreshold: 0.4,
-      /** Frames of silence before an utterance is considered finished. */
-      redemptionFrames: 12,
+      /** Silence tolerated mid-utterance before speech is considered over. */
+      redemptionMs: 384,
       /** Discard utterances shorter than this — coughs, keyboard clicks. */
-      minSpeechFrames: 6,
+      minSpeechMs: 192,
       /** Prepended context so the first phoneme is not clipped. */
-      preSpeechPadFrames: 6,
+      preSpeechPadMs: 192,
     },
     /** Hard cap so a monologue cannot grow an unbounded buffer. */
     maxUtteranceMs: 30000,

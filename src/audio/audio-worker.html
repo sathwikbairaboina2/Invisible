@@ -2,6 +2,14 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
+    <!-- 'wasm-unsafe-eval' is required: ONNX Runtime compiles the Silero model
+         to WebAssembly. blob: is required for the AudioWorklet module. Note
+         this page has no network access of any kind under this policy — every
+         asset it loads is a sibling file. -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self' 'wasm-unsafe-eval' blob:; connect-src 'self'; worker-src 'self' blob:;"
+    />
     <title>invisible-audio</title>
   </head>
   <body>

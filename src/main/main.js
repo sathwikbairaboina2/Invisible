@@ -266,6 +266,19 @@ function createAudioWorker() {
   // capture enumeration on some platforms. Cheap insurance.
   audioWin.setContentProtection(true);
 
+  // The worker window is never shown, so its DevTools console is unreachable in
+  // practice. Without this, a failed VAD asset fetch or worklet error is
+  // completely silent and looks identical to "no one is speaking".
+  if (IS_DEV) {
+    audioWin.webContents.on('console-message', (event) => {
+      const level = ['debug', 'info', 'warning', 'error'][event.level] ?? event.level;
+      log(`worker[${level}] ${event.message} (${event.sourceId}:${event.lineNumber})`);
+    });
+    audioWin.webContents.on('render-process-gone', (_e, details) => {
+      log('worker process gone:', details.reason);
+    });
+  }
+
   audioWin.on('closed', () => {
     audioWin = null;
     state.capturing = false;
@@ -453,6 +466,8 @@ function registerIpc() {
    * clone moves the ArrayBuffer without a base64 round trip.
    */
   ipcMain.on(CHANNELS.AUDIO_UTTERANCE, (_event, payload) => {
+    log('utterance', payload?.speaker, `${payload?.durationMs}ms`,
+        `${payload?.pcm?.byteLength ?? 0}B`);
     if (!agent || !payload?.pcm) return;
     agent.submitUtterance({
       speaker: payload.speaker === 'user' ? 'user' : 'remote',
@@ -463,7 +478,11 @@ function registerIpc() {
   });
 
   ipcMain.on(CHANNELS.AUDIO_LEVEL, (_event, payload) => {
-    sendToOverlay(CHANNELS.STATUS, { ...state, level: payload?.level ?? 0 });
+    sendToOverlay(CHANNELS.STATUS, {
+      ...state,
+      speakerLevel: payload?.speaker ?? 'remote',
+      level: payload?.level ?? 0,
+    });
   });
 
   ipcMain.on(CHANNELS.AUDIO_ERROR, (_event, payload) => {
