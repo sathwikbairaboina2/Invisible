@@ -314,7 +314,7 @@ function configureSession() {
           types: ['screen'],
           thumbnailSize: { width: 0, height: 0 },
         });
-        if (!sources.length) {
+        if (!sources.length || process.env.INVISIBLE_BREAK_LOOPBACK === '1') {
           callback({});
           return;
         }

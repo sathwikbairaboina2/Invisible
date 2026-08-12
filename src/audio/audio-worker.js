@@ -145,6 +145,30 @@
     chains.clear();
   }
 
+  /**
+   * System audio. Chromium requires a video source for this request to resolve
+   * even when only audio is wanted, so main's display-media handler returns a
+   * screen source alongside `audio: 'loopback'`. The video track is stopped
+   * here immediately — it is never read, and leaving it running holds a real
+   * screen-capture session open.
+   */
+  async function acquireLoopback() {
+    const stream = await navigator.mediaDevices.getDisplayMedia({
+      video: true,
+      audio: true,
+    });
+
+    for (const track of stream.getVideoTracks()) {
+      stream.removeTrack(track);
+      track.stop();
+    }
+
+    if (stream.getAudioTracks().length === 0) {
+      throw new Error('loopback returned no audio track');
+    }
+    return stream;
+  }
+
   api.onStart(async (payload) => {
     const cfg = payload && payload.audio;
     if (!cfg) {
@@ -166,6 +190,15 @@
     } catch (err) {
       api.error(`microphone unavailable: ${err.message}`);
       return;
+    }
+
+    try {
+      const loopback = await acquireLoopback();
+      await startChain({ speaker: 'remote', stream: loopback, cfg });
+    } catch (err) {
+      // Non-fatal by design: a working mic chain alone is still useful, and
+      // failing the whole worker here would take the transcript down with it.
+      api.error(`system audio unavailable: ${err.message}`);
     }
 
     startMeters();
