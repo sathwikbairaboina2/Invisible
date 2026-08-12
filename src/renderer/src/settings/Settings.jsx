@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { SetupPanel } from './SetupPanel.jsx';
 import './settings.css';
 
 /**
@@ -124,6 +125,11 @@ export function Settings() {
         Stored in your user profile. Only the values you change are saved, so defaults keep
         improving underneath them.
       </p>
+
+      {/* First, because on a fresh machine it is the only section that
+          matters, and on a working machine it is one green line to scroll
+          past. */}
+      <SetupPanel />
 
       {SECTIONS.map((section) => (
         <section key={section.title}>

@@ -8,6 +8,11 @@ body {
   color: var(--text);
   font-family: var(--font);
   font-size: 13px;
+  /* The Setup panel sits at the top of the page and grows when its probe
+     resolves, roughly a second after open. Chromium's scroll anchoring
+     compensates for content inserted above the anchor by scrolling down, which
+     threw the window to the bottom every time it was opened. */
+  overflow-anchor: none;
 }
 
 .shell {
@@ -63,7 +68,9 @@ section > h2 {
   font-size: 13px;
 }
 
-.row .hint {
+/* Not scoped to .row: the setup panel uses .setup-row and reuses .hint, and
+   scoping this made label and detail run together on one line. */
+.hint {
   display: block;
   font-size: 11.5px;
   color: var(--text-faint);
@@ -144,4 +151,67 @@ button:focus-visible {
   color: var(--warn);
   letter-spacing: 0.05em;
   text-transform: uppercase;
+}
+
+/* ---- setup panel ---- */
+
+.setup-summary {
+  font-size: 12.5px;
+  margin: 0 0 calc(var(--unit) * 3);
+  color: var(--warn);
+}
+.setup-summary[data-ok="true"] {
+  color: var(--live);
+}
+
+.setup-row {
+  display: grid;
+  /* 76px, not 68: the "missing" pill is the widest and overflowed at 68. */
+  grid-template-columns: 76px 1fr;
+  align-items: start;
+  gap: calc(var(--unit) * 3);
+  padding: calc(var(--unit) * 2.5) 0;
+  border-bottom: 1px solid var(--divider);
+}
+.setup-row:last-of-type {
+  border-bottom: 0;
+}
+
+.pill {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--text-faint);
+  text-align: center;
+  justify-self: start;
+}
+.pill[data-state="ok"] {
+  color: var(--live);
+  border-color: rgba(52, 211, 153, 0.35);
+}
+.pill[data-state="missing"] {
+  color: var(--warn);
+  border-color: rgba(251, 191, 36, 0.35);
+}
+.pill[data-state="error"] {
+  color: var(--error);
+  border-color: rgba(248, 113, 113, 0.35);
+}
+
+/* Selectable, because the entire point is copying it into a terminal. */
+.fix {
+  display: inline-block;
+  margin-top: calc(var(--unit) * 1.5);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  padding: 3px 8px;
+  border-radius: var(--radius-inner);
+  background: #09090b;
+  border: 1px solid var(--border);
+  color: var(--text);
+  user-select: text;
 }
