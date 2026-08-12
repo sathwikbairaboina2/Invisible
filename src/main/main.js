@@ -190,7 +190,13 @@ function createOverlayWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: true,
+      // sandbox: false is required for the preload to `require('./channels')`.
+      // A sandboxed preload's `require` is a polyfill covering only `electron`
+      // and a few Node built-ins, so relative imports fail. contextIsolation
+      // stays on, so the renderer world still has no Node access — only the
+      // preload does, and the renderer loads local files with navigation and
+      // window.open already blocked.
+      sandbox: false,
       backgroundThrottling: false,
       devTools: IS_DEV,
       spellcheck: false,
@@ -244,7 +250,13 @@ function createAudioWorker() {
       preload: path.join(__dirname, 'preload-audio.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: true,
+      // sandbox: false is required for the preload to `require('./channels')`.
+      // A sandboxed preload's `require` is a polyfill covering only `electron`
+      // and a few Node built-ins, so relative imports fail. contextIsolation
+      // stays on, so the renderer world still has no Node access — only the
+      // preload does, and the renderer loads local files with navigation and
+      // window.open already blocked.
+      sandbox: false,
       backgroundThrottling: false,
       devTools: IS_DEV,
     },
@@ -324,9 +336,15 @@ function registerShortcuts() {
   const failed = [];
   for (const [accelerator, handler] of bindings) {
     if (!accelerator) continue;
-    // register() returns false when another process already owns the combo.
-    const ok = globalShortcut.register(accelerator, handler);
-    if (!ok) failed.push(accelerator);
+    try {
+      // register() returns false when another process already owns the combo,
+      // but *throws* on a malformed accelerator. Both are per-binding problems
+      // and neither may abort the loop — losing one shortcut must not cost the
+      // other eight, nor the app startup that follows this call.
+      if (!globalShortcut.register(accelerator, handler)) failed.push(accelerator);
+    } catch (err) {
+      failed.push(`${accelerator} (${err.message})`);
+    }
   }
 
   if (failed.length) {

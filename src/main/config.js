@@ -56,7 +56,9 @@ module.exports = {
    * Electron accelerator syntax: https://www.electronjs.org/docs/latest/api/accelerator
    */
   shortcuts: {
-    toggleVisibility: 'Control+Shift+Backslash',
+    // Electron accelerators take the literal punctuation character; there is no
+    // 'Backslash' token, and passing one throws rather than returning false.
+    toggleVisibility: 'Control+Shift+\\',
     toggleInteractive: 'Control+Shift+Enter',
     manualAsk: 'Control+Shift+Space',
     clearContext: 'Control+Shift+K',
