@@ -1,0 +1,235 @@
+@import "../tokens.css";
+
+/* The window is transparent; only painted boxes are visible. An opaque body
+   would defeat the point. */
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  overflow: hidden;
+  font-family: var(--font);
+  color: var(--text);
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: default;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  /* Hugs its content rather than filling the window. A short answer produces a
+     short panel, which covers less of the screen and leaves no dead space
+     above the transcript. The window itself stays a fixed size; the unused
+     part of it is simply transparent. */
+  height: auto;
+  max-height: 100vh;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  /* No backdrop-filter: it costs GPU the 14B model is using.
+     No box-shadow: the window sets hasShadow false for a stealth reason. */
+}
+
+.panel.interactive {
+  border-color: rgba(96, 165, 250, 0.55);
+}
+
+/* ---- status ---- */
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--unit) * 2);
+  padding: calc(var(--unit) * 2) calc(var(--unit) * 3);
+  border-bottom: 1px solid var(--divider);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--text-faint);
+  flex: 0 0 auto;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-faint);
+  flex: 0 0 auto;
+}
+.dot[data-state="live"] {
+  background: var(--live);
+}
+.dot[data-state="warn"] {
+  background: var(--warn);
+}
+.dot[data-state="error"] {
+  background: var(--error);
+}
+
+.meters {
+  display: flex;
+  gap: var(--unit);
+  margin-left: auto;
+}
+
+.meter {
+  width: 28px;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.meter > i {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--text-faint);
+  /* The only transition in the overlay. 90ms is below the threshold where
+     peripheral vision registers it as motion. */
+  transition: width 90ms linear;
+}
+
+/* ---- answer ---- */
+
+.answer {
+  /* Takes only the height it needs. Growing to fill left ~150px of dead space
+     under a short answer with the transcript stranded at the bottom, which
+     reads as a broken layout rather than a sparse one. The slack goes to the
+     transcript instead, where it buys visible history. */
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: calc(var(--unit) * 3);
+}
+
+.lead {
+  font-size: 15px;
+  line-height: 1.35;
+  font-weight: 550;
+  letter-spacing: -0.011em;
+  color: var(--text);
+  margin: 0;
+}
+
+.bullets {
+  list-style: none;
+  margin: calc(var(--unit) * 2.5) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--unit) * 1.5);
+}
+
+.bullets li {
+  display: grid;
+  grid-template-columns: 12px 1fr;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--text-dim);
+}
+
+.bullets li::before {
+  content: "▸";
+  color: var(--text-faint);
+}
+
+.answer code {
+  font-family: var(--mono);
+  font-size: 0.92em;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text);
+}
+
+.cursor {
+  display: inline-block;
+  width: 0.5ch;
+  margin-left: 1px;
+  animation: blink 1.05s steps(1, end) infinite;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+/* Respect the OS setting; the cursor is the one thing that moves. */
+@media (prefers-reduced-motion: reduce) {
+  .cursor {
+    animation: none;
+  }
+  .meter > i {
+    transition: none;
+  }
+}
+
+.placeholder {
+  font-size: 13px;
+  color: var(--text-faint);
+  margin: 0;
+}
+
+/* ---- transcript ---- */
+
+.transcript {
+  flex: 0 0 auto;
+  padding: calc(var(--unit) * 2) calc(var(--unit) * 3);
+  /* The border lives on this wrapper, not on the scroller. Putting it on the
+     masked element faded the divider out along with the text. */
+  border-top: 1px solid var(--divider);
+}
+
+.transcript-scroll {
+  max-height: 88px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--unit);
+  /* Scrolled-off lines fade instead of being sliced mid-glyph. A hard cut at
+     the top reads as a rendering bug; a fade reads as history. */
+  mask-image: linear-gradient(to bottom, transparent 0, #000 16px);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 16px);
+}
+
+.line {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  gap: var(--unit);
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--text-dim);
+}
+
+.line .who {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  padding-top: 1px;
+}
+
+.line[data-speaker="user"] .who {
+  color: var(--focus);
+}
+
+/* ---- error ---- */
+
+.error {
+  flex: 0 0 auto;
+  padding: calc(var(--unit) * 1.5) calc(var(--unit) * 3);
+  border-top: 1px solid var(--divider);
+  font-size: 11px;
+  color: var(--error);
+}
+
+/* Scrollbars are chrome; on a four-line surface they are pure cost. */
+::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}

@@ -260,6 +260,24 @@ function createOverlayWindow() {
     applyStealth(overlayWin);
   });
 
+  // Dev-only design check. The overlay is click-through, non-focusable, and
+  // excluded from screen capture, so the only way to actually look at it is to
+  // ask the renderer for its own surface — capturePage reads that rather than
+  // the screen, so display affinity does not block it.
+  if (IS_DEV && process.env.INVISIBLE_CAPTURE) {
+    const target = process.env.INVISIBLE_CAPTURE;
+    const delay = Number(process.env.INVISIBLE_CAPTURE_DELAY_MS ?? 3000);
+    setTimeout(async () => {
+      try {
+        const image = await overlayWin.webContents.capturePage();
+        require('node:fs').writeFileSync(target, image.toPNG());
+        log('captured overlay to', target);
+      } catch (err) {
+        log('capture failed:', err.message);
+      }
+    }, delay);
+  }
+
   return overlayWin;
 }
 

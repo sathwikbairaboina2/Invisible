@@ -1,40 +1,19 @@
 import React from 'react';
 import { useAgent } from '../useAgent.js';
+import { StatusBar } from './StatusBar.jsx';
+import { Answer } from './Answer.jsx';
+import { Transcript } from './Transcript.jsx';
+import './overlay.css';
 
 export function Overlay() {
   const { status, turn, answer, transcript, error } = useAgent();
 
-  const label = !status.capturing
-    ? 'idle'
-    : status.stt === 'starting'
-      ? 'loading model…'
-      : status.stt === 'failed'
-        ? 'transcription offline'
-        : status.stt !== 'ready'
-          ? 'waiting for model'
-          : status.llm === 'offline'
-            ? 'listening · no LLM'
-            : 'listening';
-
   return (
-    <div id="root-layout">
-      <div>
-        {label}
-        {status.dropped > 0 ? ` · ${status.dropped} dropped` : ''}
-      </div>
-      <div>
-        {answer}
-        {turn.streaming ? '▌' : ''}
-      </div>
-      <div>
-        {transcript.map((line) => (
-          <div key={line.key}>
-            {line.speaker === 'user' ? 'you: ' : 'them: '}
-            {line.text}
-          </div>
-        ))}
-      </div>
-      {error ? <div>{`[${error.scope}] ${error.message}`}</div> : null}
+    <div className={status.interactive ? 'panel interactive' : 'panel'}>
+      <StatusBar status={status} />
+      <Answer answer={answer} streaming={turn.streaming} aborted={turn.aborted} />
+      <Transcript lines={transcript} />
+      {error ? <div className="error">{`${error.scope}: ${error.message}`}</div> : null}
     </div>
   );
 }

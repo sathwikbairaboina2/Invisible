@@ -1,0 +1,35 @@
+/*
+ * The design system for both windows.
+ *
+ * Values are chosen against the overlay's actual constraint: read in
+ * peripheral vision, while speaking, over an unpredictable background.
+ * Contrast ratios below are against #09090b.
+ */
+:root {
+  --surface: rgba(9, 9, 11, 0.86);
+  --surface-raised: rgba(24, 24, 27, 0.92);
+  --border: rgba(255, 255, 255, 0.1);
+  --divider: rgba(255, 255, 255, 0.06);
+
+  --text: #f4f4f5; /* 19:1  */
+  --text-dim: #a1a1aa; /* 7.4:1 */
+  --text-faint: #8b8b93; /* 5.2:1 — deliberately lighter than the usual
+                            #71717a, which lands at 4.1:1 and fails on the
+                            small type this is used for. */
+
+  --live: #34d399;
+  --warn: #fbbf24;
+  --error: #f87171;
+  --focus: #60a5fa;
+
+  --font: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --mono: ui-monospace, "Cascadia Code", Consolas, monospace;
+
+  --unit: 4px;
+  --radius: 10px;
+  --radius-inner: 6px;
+}
+
+* {
+  box-sizing: border-box;
+}
