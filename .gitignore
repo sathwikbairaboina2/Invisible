@@ -26,6 +26,9 @@ corpus/*
 # Vite renderer build output. Regenerate with `npm run ui:build`.
 src/renderer/dist/
 
+# electron-builder output.
+release/
+
 .env
 .env.local
 *.log

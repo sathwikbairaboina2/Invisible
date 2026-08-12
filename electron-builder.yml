@@ -1,0 +1,37 @@
+appId: dev.invisible.overlay
+productName: Invisible
+
+directories:
+  output: release
+  buildResources: build
+
+# App code and the 17 MB of vendored VAD/ONNX assets only.
+#
+# bin/ is 1,127 MB and models/ is 1,549 MB. Bundling them would produce a
+# ~2.7 GB installer that STILL would not run without Docker, two containers,
+# and a 9 GB Ollama pull — so they stay fetched by `npm run fetch-whisper`,
+# and the Setup panel is what makes that discoverable.
+files:
+  - src/main/**/*
+  - src/graph/**/*
+  - src/whisper/**/*
+  - src/ollama/**/*
+  - src/qdrant/**/*
+  - src/audio/**/*
+  - src/renderer/dist/**/*
+  - package.json
+
+asar: true
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Invisible

@@ -22,6 +22,23 @@ const { createSettingsStore } = require('./settings-store');
 const { checkSetup } = require('./setup-check');
 
 const IS_DEV = !app.isPackaged || process.env.INVISIBLE_DEV === '1';
+
+/**
+ * Where `bin/` and `models/` live.
+ *
+ * From source that is the project root. In a packaged build it must be the
+ * directory containing the executable, NOT the project layout: `__dirname`
+ * there points inside `app.asar`, a read-only archive, so a packaged install
+ * could never find a whisper binary no matter what the operator downloaded.
+ *
+ * The whisper binary and model are 2.7 GB and are deliberately not bundled, so
+ * the operator places them beside Invisible.exe.
+ */
+function assetRoot() {
+  return app.isPackaged
+    ? path.dirname(app.getPath('exe'))
+    : path.join(__dirname, '..', '..');
+}
 const IS_WIN = process.platform === 'win32';
 const IS_MAC = process.platform === 'darwin';
 
@@ -692,7 +709,7 @@ function registerIpc() {
 
     return checkSetup({
       config,
-      root: path.join(__dirname, '..', '..'),
+      root: assetRoot(),
       ollamaProbe: () => ollama.probe(),
       qdrantProbe: () => retrieval.probe(),
     });
@@ -800,7 +817,7 @@ if (!app.requestSingleInstanceLock()) {
     // the whisper client.
     sidecar = createSidecar({
       config: config.whisper,
-      root: path.join(__dirname, '..', '..'),
+      root: assetRoot(),
       onLog: (line) => log('whisper:', line),
       onStateChange: (next, detail) => {
         state.stt = next;

@@ -3,12 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "description": "Local-first, screen-capture-excluded meeting overlay assistant.",
+  "author": "sathwik",
   "main": "src/main/main.js",
   "scripts": {
     "start": "electron .",
     "dev": "npm run ui:build && cross-env INVISIBLE_DEV=1 electron .",
     "ui:build": "vite build",
     "ui:watch": "vite build --watch",
+    "dist": "npm run ui:build && electron-builder --config electron-builder.yml",
     "test": "node --test \"test/**/*.test.js\"",
     "vendor": "node scripts/copy-vendor.js",
     "fetch-whisper": "node scripts/fetch-whisper.js",
@@ -26,16 +28,17 @@
     "@langchain/core": "^0.3.40",
     "@langchain/langgraph": "^0.2.44",
     "@langchain/ollama": "^0.1.5",
-    "@qdrant/js-client-rest": "^1.13.0",
-    "@ricky0123/vad-web": "^0.0.30",
-    "onnxruntime-web": "^1.27.0",
-    "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "@qdrant/js-client-rest": "^1.13.0"
   },
   "devDependencies": {
+    "@ricky0123/vad-web": "^0.0.30",
     "@vitejs/plugin-react": "^6.0.5",
     "cross-env": "^7.0.3",
     "electron": "^43.4.0",
+    "electron-builder": "^26.15.3",
+    "onnxruntime-web": "^1.27.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
     "vite": "^8.2.1"
   },
   "allowScripts": {
