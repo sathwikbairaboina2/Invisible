@@ -31,6 +31,9 @@
     else if (stt !== 'ready') label = 'waiting for model';
     else if (state.llm === 'offline') label = 'listening · no LLM';
     else if (state.llm === 'no-model') label = 'listening · model not pulled';
+    // Retrieval being absent is not a degraded mode the way a dead LLM is, so
+    // it reads as a note rather than a failure.
+    else if (state.rag === 'offline') label = 'listening · no context';
     else label = 'listening';
 
     if (state.dropped > 0) label += ` · ${state.dropped} dropped`;

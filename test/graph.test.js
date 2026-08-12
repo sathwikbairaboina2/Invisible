@@ -476,6 +476,65 @@ test('a deliberate supersede is not reported as an error', async () => {
   runtime.dispose();
 });
 
+test('runtime forwards an injected search to the retriever', async () => {
+  const { events, handlers } = collector();
+  const queries = [];
+
+  const runtime = createAgentRuntime({
+    ...handlers,
+    transcribe: async () => 'Tell me about a hard bug you debugged.',
+    search: async (text) => {
+      queries.push(text);
+      return [{ text: 'A race in the session cache.', score: 0.8, source: 's.md', heading: 'Bug' }];
+    },
+    stream: async function* (state) {
+      // The retrieved context must have reached the generator's state, or the
+      // whole retrieval path is decorative.
+      yield state.retrieved.length > 0 ? 'grounded' : 'ungrounded';
+    },
+  });
+
+  await runtime.submitUtterance({
+    speaker: 'remote',
+    pcm: silence(),
+    sampleRate: 16000,
+    durationMs: 1000,
+  });
+
+  assert.deepEqual(queries, ['Tell me about a hard bug you debugged.']);
+  assert.equal(events.tokens.map((t) => t.token).join(''), 'grounded');
+
+  runtime.dispose();
+});
+
+test("the operator's own speech never triggers a search", async () => {
+  // Triage rejects it before the retriever, so this asserts the graph edge
+  // rather than the retriever's own behaviour — an embedding call per sentence
+  // the operator speaks would be pure waste.
+  const { handlers } = collector();
+  let searches = 0;
+
+  const runtime = createAgentRuntime({
+    ...handlers,
+    transcribe: async () => 'I would range-partition on tenant id.',
+    search: async () => {
+      searches += 1;
+      return [];
+    },
+  });
+
+  await runtime.submitUtterance({
+    speaker: 'user',
+    pcm: silence(),
+    sampleRate: 16000,
+    durationMs: 1000,
+  });
+
+  assert.equal(searches, 0);
+
+  runtime.dispose();
+});
+
 test('runtime forwards an injected stream to the generator', async () => {
   const { events, handlers } = collector();
   const seen = [];

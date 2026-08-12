@@ -17,6 +17,7 @@ const { createSidecar } = require('../whisper/sidecar');
 const { createWhisperClient } = require('../whisper/client');
 const { createSerialQueue } = require('../whisper/queue');
 const { createOllamaClient } = require('../ollama/client');
+const { createRetrievalClient } = require('../qdrant/client');
 
 const IS_DEV = !app.isPackaged || process.env.INVISIBLE_DEV === '1';
 const IS_WIN = process.platform === 'win32';
@@ -61,6 +62,8 @@ const state = {
   dropped: 0,
   /** Ollama reachability, mirrored to the overlay. */
   llm: 'unknown',
+  /** Retrieval readiness, mirrored to the overlay. */
+  rag: 'unknown',
 };
 
 /** Per-turn timing, keyed by turnId. Entries are deleted on turn end. */
@@ -495,9 +498,32 @@ function initAgent() {
     })
     .catch((err) => log('ollama probe failed:', err.message));
 
+  const retrieval = createRetrievalClient({
+    url: config.agent.qdrant.url,
+    collection: config.agent.qdrant.collection,
+    topK: config.agent.qdrant.topK,
+    scoreThreshold: config.agent.qdrant.scoreThreshold,
+    ollamaBaseUrl: config.agent.ollamaBaseUrl,
+    embedModel: config.agent.embedModel,
+  });
+
+  // Probed once at startup. An empty or missing collection is deliberately not
+  // an error: the app is fully usable with no corpus at all, just less
+  // specific, and a red banner on a fresh clone trains the operator to ignore
+  // banners.
+  retrieval
+    .probe()
+    .then((result) => {
+      state.rag = !result.ok ? 'offline' : result.exists && result.points > 0 ? 'ready' : 'empty';
+      log('qdrant', state.rag, result.exists ? `${result.points} points` : '', result.error ?? '');
+      pushStatus({});
+    })
+    .catch((err) => log('qdrant probe failed:', err.message));
+
   return createAgentRuntime({
     config: config.agent,
     transcribe,
+    search: retrieval.search,
     stream: ollama.stream,
     // Every emitter below is the single path from graph -> UI.
     onTurnStart: (turn) => {

@@ -60,6 +60,7 @@ function createAgentRuntime(options = {}) {
   const {
     config = {},
     transcribe,
+    search,
     stream,
     onTurnStart,
     onToken,
@@ -72,7 +73,8 @@ function createAgentRuntime(options = {}) {
     // Absent, createTranscriber falls back to its Phase 1 stub.
     transcriber: createTranscriber({ transcribe, onTranscriptFinal }),
     triage: createTriage({}),
-    retriever: createRetriever({ scoreThreshold: config?.qdrant?.scoreThreshold }),
+    // Absent, createRetriever returns [] and generation proceeds ungrounded.
+    retriever: createRetriever({ search, scoreThreshold: config?.qdrant?.scoreThreshold }),
     // Absent, createGenerator falls back to its Phase 1 stub stream.
     generator: createGenerator({ stream, onToken }),
   });
