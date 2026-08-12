@@ -14,6 +14,11 @@ const NON_SPEECH =
 function isNonSpeech(text) {
   const trimmed = String(text ?? '').trim();
   if (trimmed.length === 0) return true;
+  // No letters or digits means no words. Measured against the real model,
+  // three seconds of white noise transcribes to " ." with a no-speech
+  // probability of 1e-12 — it clears every confidence threshold, so content is
+  // the only thing that catches it.
+  if (!/[\p{L}\p{N}]/u.test(trimmed)) return true;
   return NON_SPEECH.test(trimmed);
 }
 
@@ -30,6 +35,28 @@ function isNonSpeech(text) {
  * @param {{baseUrl: string, fetchImpl?: typeof fetch, timeoutMs?: number,
  *          language?: string}} options
  */
+/**
+ * Whisper hallucinates fluent sentences onto near-silence and room noise.
+ * Observed in real use: "I need the Swarovs to produce now" from an empty
+ * room, "Bagessele.", "The shapes there, man."
+ *
+ * The model knows — it reports a high no-speech probability, or a very low
+ * average log-probability, or both — but the flat `text` field discards that.
+ * Asking for verbose_json and filtering per segment is what makes it visible.
+ *
+ * Thresholds are the ones OpenAI's own reference decoder uses to suppress the
+ * same failure.
+ */
+const NO_SPEECH_THRESHOLD = 0.6;
+const LOGPROB_THRESHOLD = -1.0;
+
+/** True when whisper's own scores say this segment is not speech. */
+function isHallucinated(segment) {
+  const noSpeech = typeof segment?.no_speech_prob === 'number' ? segment.no_speech_prob : 0;
+  const logProb = typeof segment?.avg_logprob === 'number' ? segment.avg_logprob : 0;
+  return noSpeech > NO_SPEECH_THRESHOLD || logProb < LOGPROB_THRESHOLD;
+}
+
 function createWhisperClient({ baseUrl, fetchImpl = fetch, timeoutMs = 30000, language } = {}) {
   if (!baseUrl) throw new TypeError('createWhisperClient: baseUrl is required');
 
@@ -49,7 +76,9 @@ function createWhisperClient({ baseUrl, fetchImpl = fetch, timeoutMs = 30000, la
 
     const form = new FormData();
     form.append('file', new Blob([wav], { type: 'audio/wav' }), 'utterance.wav');
-    form.append('response_format', 'json');
+    // verbose_json rather than json: the flat text field hides the per-segment
+    // confidence that distinguishes a real sentence from a hallucination.
+    form.append('response_format', 'verbose_json');
     // Greedy decoding: this is a latency-sensitive path and sampling buys
     // nothing when the audio is already VAD-trimmed to one utterance.
     form.append('temperature', '0');
@@ -78,10 +107,22 @@ function createWhisperClient({ baseUrl, fetchImpl = fetch, timeoutMs = 30000, la
       throw new Error('whisper: response had no text field');
     }
 
+    // Rebuilt from the segments that survive filtering, so a real question
+    // preceded by a hallucinated fragment keeps the question. Falls back to the
+    // flat field when a server or format returns no segments — better to
+    // transcribe unfiltered than to transcribe everything to nothing.
+    const segments = Array.isArray(payload.segments) ? payload.segments : null;
+    const raw = segments
+      ? segments
+          .filter((segment) => !isHallucinated(segment))
+          .map((segment) => segment.text ?? '')
+          .join(' ')
+      : payload.text;
+
     // whisper.cpp joins its internal segments with newlines, so one spoken
     // sentence arrives split mid-clause. Collapsing all whitespace gives the
     // overlay a single readable line and keeps the prompt free of stray breaks.
-    const normalized = payload.text.replace(/\s+/g, ' ').trim();
+    const normalized = raw.replace(/\s+/g, ' ').trim();
 
     return {
       text: isNonSpeech(normalized) ? '' : normalized,
