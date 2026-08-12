@@ -46,6 +46,8 @@ app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
 let overlayWin = null;
 /** @type {BrowserWindow | null} */
 let audioWin = null;
+/** @type {BrowserWindow | null} */
+let settingsWin = null;
 /** @type {import('../graph/graph').AgentRuntime | null} */
 let agent = null;
 /** @type {ReturnType<typeof createSidecar> | null} */
@@ -263,25 +265,76 @@ function createOverlayWindow() {
     applyStealth(overlayWin);
   });
 
-  // Dev-only design check. The overlay is click-through, non-focusable, and
-  // excluded from screen capture, so the only way to actually look at it is to
-  // ask the renderer for its own surface — capturePage reads that rather than
-  // the screen, so display affinity does not block it.
-  if (IS_DEV && process.env.INVISIBLE_CAPTURE) {
-    const target = process.env.INVISIBLE_CAPTURE;
-    const delay = Number(process.env.INVISIBLE_CAPTURE_DELAY_MS ?? 3000);
-    setTimeout(async () => {
-      try {
-        const image = await overlayWin.webContents.capturePage();
-        require('node:fs').writeFileSync(target, image.toPNG());
-        log('captured overlay to', target);
-      } catch (err) {
-        log('capture failed:', err.message);
-      }
-    }, delay);
-  }
+  scheduleCapture(overlayWin, 'overlay', process.env.INVISIBLE_CAPTURE);
 
   return overlayWin;
+}
+
+/**
+ * Dev-only design check. The overlay is click-through, non-focusable, and
+ * excluded from screen capture, so the only way to actually look at it is to
+ * ask the renderer for its own surface — capturePage reads that rather than
+ * the screen, so display affinity does not block it.
+ *
+ * @param {BrowserWindow} win
+ * @param {string} label
+ * @param {string|undefined} target PNG path; no capture when unset
+ */
+function scheduleCapture(win, label, target) {
+  if (!IS_DEV || !target) return;
+
+  const delay = Number(process.env.INVISIBLE_CAPTURE_DELAY_MS ?? 3000);
+  setTimeout(async () => {
+    try {
+      if (!win || win.isDestroyed()) return;
+      const image = await win.webContents.capturePage();
+      require('node:fs').writeFileSync(target, image.toPNG());
+      log(`captured ${label} to`, target);
+    } catch (err) {
+      log(`capture ${label} failed:`, err.message);
+    }
+  }, delay);
+}
+
+/**
+ * An ordinary window, unlike the overlay: focusable, opaque, in the taskbar,
+ * and deliberately NOT content-protected. It holds no live conversation, and
+ * hiding it from screen capture would only make it harder to get help with.
+ */
+function createSettingsWindow() {
+  if (settingsWin && !settingsWin.isDestroyed()) {
+    settingsWin.show();
+    settingsWin.focus();
+    return settingsWin;
+  }
+
+  settingsWin = new BrowserWindow({
+    width: 760,
+    height: 720,
+    show: false,
+    title: 'Invisible — Settings',
+    backgroundColor: '#09090b',
+    autoHideMenuBar: true,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+      devTools: IS_DEV,
+    },
+  });
+
+  settingsWin.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  settingsWin.on('closed', () => {
+    settingsWin = null;
+  });
+
+  settingsWin.loadFile(path.join(__dirname, '..', 'renderer', 'dist', 'settings.html'));
+  settingsWin.once('ready-to-show', () => settingsWin.show());
+
+  scheduleCapture(settingsWin, 'settings', process.env.INVISIBLE_CAPTURE_SETTINGS);
+
+  return settingsWin;
 }
 
 /**
@@ -396,6 +449,7 @@ function registerShortcuts() {
     [shortcuts.nudgeDown, () => nudge(0, config.overlay.nudgeStep)],
     [shortcuts.nudgeLeft, () => nudge(-config.overlay.nudgeStep, 0)],
     [shortcuts.nudgeRight, () => nudge(config.overlay.nudgeStep, 0)],
+    [shortcuts.openSettings, () => createSettingsWindow()],
   ];
 
   const failed = [];
@@ -618,6 +672,8 @@ function registerIpc() {
     }
   });
 
+  ipcMain.on(CHANNELS.SETTINGS_OPEN, () => createSettingsWindow());
+
   ipcMain.handle(CHANNELS.SETTINGS_GET, () => settings.get());
 
   ipcMain.handle(CHANNELS.SETTINGS_SET, (_event, patch) => {
@@ -743,6 +799,10 @@ if (!app.requestSingleInstanceLock()) {
     // fail with "whisper-server is not ready", which surfaces as an error
     // rather than a hang.
     sidecar.start().catch((err) => log('whisper failed to start:', err.message));
+
+    // Asking for a settings screenshot implies wanting the window, and the
+    // shortcut cannot be pressed from a script.
+    if (IS_DEV && process.env.INVISIBLE_CAPTURE_SETTINGS) createSettingsWindow();
 
     // Kick off capture once the worker's preload has attached.
     audioWin?.webContents.once('did-finish-load', () => {

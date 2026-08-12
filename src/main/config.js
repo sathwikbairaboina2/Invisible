@@ -129,5 +129,6 @@ module.exports = {
     nudgeDown: 'Control+Shift+Down',
     nudgeLeft: 'Control+Shift+Left',
     nudgeRight: 'Control+Shift+Right',
+    openSettings: 'Control+Shift+,',
   },
 };
