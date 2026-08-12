@@ -65,6 +65,17 @@ module.exports = {
     maxQueueDepth: 8,
   },
 
+  corpus: {
+    /**
+     * Where the operator's markdown lives. Relative paths resolve from the
+     * project root. Override with INVISIBLE_CORPUS_DIR to point at notes kept
+     * outside the repo — an Obsidian vault, for instance.
+     */
+    dir: process.env.INVISIBLE_CORPUS_DIR || 'corpus',
+    /** Sections longer than this are split again on paragraph boundaries. */
+    maxChunkChars: 1200,
+  },
+
   agent: {
     // Port 11435, not Ollama's default 11434: two containers from other
     // projects on this machine already bind 11434, and this app owns its own
@@ -85,8 +96,19 @@ module.exports = {
       url: process.env.QDRANT_URL || 'http://127.0.0.1:6333',
       collection: 'invisible_context',
       topK: 4,
-      /** Below this cosine score, retrieved chunks are treated as noise. */
-      scoreThreshold: 0.45,
+      /**
+       * Below this cosine score, retrieved chunks are treated as noise.
+       *
+       * 0.6, not the 0.45 originally guessed. nomic-embed-text scores any two
+       * English sentences highly, so measured on a real corpus a pure
+       * algorithms question still pulled a résumé story at 0.51. With the
+       * model's task prefixes applied, genuine hits land at 0.62-0.72 and
+       * irrelevant ones peak around 0.56, which is where this sits.
+       *
+       * The threshold exists to exclude, not to maximise recall: the overlay
+       * shows four lines and a marginal match displaces real answer.
+       */
+      scoreThreshold: 0.6,
     },
   },
 
