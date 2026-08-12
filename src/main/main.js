@@ -16,6 +16,7 @@ const { CHANNELS } = require('./channels');
 const { createSidecar } = require('../whisper/sidecar');
 const { createWhisperClient } = require('../whisper/client');
 const { createSerialQueue } = require('../whisper/queue');
+const { createOllamaClient } = require('../ollama/client');
 
 const IS_DEV = !app.isPackaged || process.env.INVISIBLE_DEV === '1';
 const IS_WIN = process.platform === 'win32';
@@ -58,6 +59,8 @@ const state = {
   stt: 'stopped',
   /** Utterances discarded because the transcription backlog was full. */
   dropped: 0,
+  /** Ollama reachability, mirrored to the overlay. */
+  llm: 'unknown',
 };
 
 // ---------------------------------------------------------------------------
@@ -449,9 +452,42 @@ function initAgent() {
     return text;
   }
 
+  const ollama = createOllamaClient({
+    baseUrl: config.agent.ollamaBaseUrl,
+    model: config.agent.model,
+    temperature: config.agent.temperature,
+    numPredict: config.agent.numPredict,
+    keepAlive: config.agent.keepAlive,
+    historyTurns: config.agent.historyTurns,
+  });
+
+  // Probed once at startup rather than per turn: a per-turn probe would add a
+  // round trip to the latency path to answer a question that changes rarely.
+  ollama
+    .probe()
+    .then((result) => {
+      state.llm = result.ok ? (result.hasModel ? 'ready' : 'no-model') : 'offline';
+      log('ollama', state.llm, result.error ?? '');
+      pushStatus({});
+
+      if (state.llm === 'no-model') {
+        sendToOverlay(CHANNELS.AGENT_ERROR, {
+          scope: 'llm',
+          message: `${config.agent.model} not pulled - run \`npm run ollama:pull\``,
+        });
+      } else if (state.llm === 'offline') {
+        sendToOverlay(CHANNELS.AGENT_ERROR, {
+          scope: 'llm',
+          message: `Ollama unreachable at ${config.agent.ollamaBaseUrl} - run \`npm run ollama:up\``,
+        });
+      }
+    })
+    .catch((err) => log('ollama probe failed:', err.message));
+
   return createAgentRuntime({
     config: config.agent,
     transcribe,
+    stream: ollama.stream,
     // Every emitter below is the single path from graph -> UI.
     onTurnStart: (turn) => {
       log('turn start', turn.turnId, turn.speaker);

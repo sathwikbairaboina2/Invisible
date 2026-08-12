@@ -66,12 +66,19 @@ module.exports = {
   },
 
   agent: {
-    ollamaBaseUrl: process.env.OLLAMA_HOST || 'http://127.0.0.1:11434',
+    // Port 11435, not Ollama's default 11434: two containers from other
+    // projects on this machine already bind 11434, and this app owns its own
+    // GPU-enabled container. See docker/ollama.compose.yml.
+    ollamaBaseUrl: process.env.OLLAMA_HOST || 'http://127.0.0.1:11435',
     model: process.env.INVISIBLE_MODEL || 'qwen2.5-coder:14b-instruct-q4_K_M',
-    /** Small model used only by the triage node to gate generation. */
-    triageModel: process.env.INVISIBLE_TRIAGE_MODEL || 'llama3.2:1b',
     embedModel: process.env.INVISIBLE_EMBED_MODEL || 'nomic-embed-text',
     temperature: 0.2,
+    /** Caps a runaway answer; the requested shape is under 60 words. */
+    numPredict: 200,
+    /** Keeps the 9 GB model resident between questions. */
+    keepAlive: '30m',
+    /** Dialogue turns sent to the model, so follow-up questions resolve. */
+    historyTurns: 8,
     /** Transcript turns retained in graph state. Older turns are dropped. */
     transcriptWindow: 40,
     qdrant: {

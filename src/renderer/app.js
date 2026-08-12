@@ -29,6 +29,8 @@
     else if (stt === 'failed') label = 'transcription offline';
     else if (!live) label = 'idle';
     else if (stt !== 'ready') label = 'waiting for model';
+    else if (state.llm === 'offline') label = 'listening · no LLM';
+    else if (state.llm === 'no-model') label = 'listening · model not pulled';
     else label = 'listening';
 
     if (state.dropped > 0) label += ` · ${state.dropped} dropped`;
