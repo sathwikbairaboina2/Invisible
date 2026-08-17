@@ -77,10 +77,10 @@ module.exports = {
   },
 
   agent: {
-    // Port 11435, not Ollama's default 11434: two containers from other
-    // projects on this machine already bind 11434, and this app owns its own
-    // GPU-enabled container. See docker/ollama.compose.yml.
-    ollamaBaseUrl: process.env.OLLAMA_HOST || 'http://127.0.0.1:11435',
+    // Port 11436, not Ollama's default 11434: containers from other projects on
+    // this machine already bind 11434 and 11435, and this app owns its own
+    // GPU-enabled container. Must match docker/compose.yml.
+    ollamaBaseUrl: process.env.OLLAMA_HOST || 'http://127.0.0.1:11436',
     model: process.env.INVISIBLE_MODEL || 'qwen2.5-coder:14b-instruct-q4_K_M',
     embedModel: process.env.INVISIBLE_EMBED_MODEL || 'nomic-embed-text',
     temperature: 0.2,
