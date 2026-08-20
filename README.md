@@ -135,11 +135,3 @@ only — place `bin/` and `models/` beside the installed `Invisible.exe`, or run
 
 **The installer is unsigned.** Windows SmartScreen will warn on first run;
 dismiss it with *More info → Run anyway*.
-
----
-
-## Design documents
-
-`docs/superpowers/specs/` holds the design and every decision that changed
-during implementation, with the measurements behind each.
-`docs/superpowers/plans/` holds the per-phase implementation plans.
