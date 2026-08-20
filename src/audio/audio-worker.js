@@ -46,6 +46,67 @@
    * treats the context as borrowed and will not close it on destroy().
    */
   function vadOptions(cfg, speaker, context, stream) {
+    /**
+     * Speculative-transcription bookkeeping. onFrameProcessed hands us every
+     * 32 ms frame with its speech probability, which is enough to rebuild the
+     * utterance audio ourselves and ship a draft mid-silence — while MicVAD's
+     * own redemption window is still deciding whether the speaker is done.
+     */
+    const speculativeFrames = cfg.vad.speculativeFrames ?? 0;
+    const preFrames = Math.ceil((cfg.vad.preSpeechPadMs ?? 0) / 32);
+    const maxFrames = Math.ceil((cfg.maxUtteranceMs ?? 30000) / 32) + preFrames;
+    /** Rolling pre-speech context while idle. @type {Float32Array[]} */
+    let ring = [];
+    /** Frames of the utterance in progress. @type {Float32Array[]} */
+    let collected = [];
+    let collecting = false;
+    let lowRun = 0;
+    let partialSeq = 0;
+    let lastPartialId = null;
+    /** True while the silence that produced lastPartialId is still unbroken. */
+    let silenceUnbroken = false;
+
+    function emitPartial() {
+      const samples = collected.reduce((n, f) => n + f.length, 0);
+      const pcm = new Float32Array(samples);
+      let offset = 0;
+      for (const frame of collected) {
+        pcm.set(frame, offset);
+        offset += frame.length;
+      }
+      lastPartialId = `${speaker}-${++partialSeq}`;
+      silenceUnbroken = true;
+      api.utterancePartial({
+        speaker,
+        pcm: pcm.buffer,
+        sampleRate: cfg.sampleRate,
+        durationMs: Math.round((pcm.length / cfg.sampleRate) * 1000),
+        partialId: lastPartialId,
+      });
+    }
+
+    function onFrame(probs, frame) {
+      if (speculativeFrames <= 0) return;
+      // Frames may be reused by the worklet; copy before keeping a reference.
+      const copy = new Float32Array(frame);
+      if (!collecting) {
+        ring.push(copy);
+        if (ring.length > preFrames) ring.shift();
+        return;
+      }
+      if (collected.length < maxFrames) collected.push(copy);
+
+      if (probs.isSpeech < cfg.vad.negativeSpeechThreshold) {
+        lowRun += 1;
+        // Exactly once per silence episode, part-way into the redemption
+        // window: late enough to skip breath pauses, early enough to matter.
+        if (lowRun === speculativeFrames) emitPartial();
+      } else {
+        lowRun = 0;
+        silenceUnbroken = false;
+      }
+    }
+
     return {
       audioContext: context,
       getStream: async () => stream,
@@ -68,7 +129,16 @@
       // Pausing must not manufacture a half-utterance.
       submitUserSpeechOnPause: false,
 
-      onSpeechStart: () => api.speechStart(speaker),
+      onFrameProcessed: onFrame,
+
+      onSpeechStart: () => {
+        collecting = true;
+        collected = ring.slice();
+        ring = [];
+        lowRun = 0;
+        silenceUnbroken = false;
+        api.speechStart(speaker);
+      },
 
       /** @param {Float32Array} audio mono, 16 kHz, samples in [-1, 1] */
       onSpeechEnd: (audio) => {
@@ -83,11 +153,23 @@
           pcm: pcm.buffer,
           sampleRate: cfg.sampleRate,
           durationMs: Math.round((pcm.length / cfg.sampleRate) * 1000),
+          // Reusable only when the utterance ended inside the same silence
+          // that triggered the draft; resumed speech invalidated it.
+          partialId: silenceUnbroken ? lastPartialId : null,
         });
+        collecting = false;
+        collected = [];
+        lowRun = 0;
+        silenceUnbroken = false;
       },
 
       // Speech that never reached minSpeechMs — a cough, a keystroke.
-      onVADMisfire: () => {},
+      onVADMisfire: () => {
+        collecting = false;
+        collected = [];
+        lowRun = 0;
+        silenceUnbroken = false;
+      },
     };
   }
 

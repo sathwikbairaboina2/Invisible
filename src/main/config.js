@@ -48,6 +48,14 @@ module.exports = {
       minSpeechMs: 192,
       /** Prepended context so the first phoneme is not clipped. */
       preSpeechPadMs: 192,
+      /**
+       * Speculative transcription: after this many consecutive silent frames
+       * (32 ms each) mid-utterance, the audio so far is transcribed while the
+       * redemption window is still open. If the utterance then ends in that
+       * same silence, the draft is reused and the whisper cost plus the rest
+       * of the window vanish from the latency path. 0 disables.
+       */
+      speculativeFrames: 6,
     },
     /** Hard cap so a monologue cannot grow an unbounded buffer. */
     maxUtteranceMs: 30000,

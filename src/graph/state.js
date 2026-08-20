@@ -34,6 +34,9 @@ const AgentState = Annotation.Root({
   /** Rolling summary of turns that fell out of the recent-history window. */
   summary: Annotation({ default: () => '' }),
 
+  /** True when the utterance was pre-transcribed during the VAD window. */
+  speculative: Annotation({ default: () => false }),
+
   /** Transcriber output for this turn. */
   utterance: Annotation(),
 

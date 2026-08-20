@@ -31,6 +31,12 @@ contextBridge.exposeInMainWorld('invisibleAudio', {
    *          durationMs: number}} payload
    */
   utterance: (payload) => send(CHANNELS.AUDIO_UTTERANCE, payload),
+  /**
+   * Mid-silence draft of the utterance still inside the redemption window.
+   * @param {{speaker: string, pcm: ArrayBuffer, sampleRate: number,
+   *          durationMs: number, partialId: string}} payload
+   */
+  utterancePartial: (payload) => send(CHANNELS.AUDIO_UTTERANCE_PARTIAL, payload),
   level: (speaker, value) => send(CHANNELS.AUDIO_LEVEL, { speaker, level: value }),
   error: (message) => send(CHANNELS.AUDIO_ERROR, { message: String(message) }),
 });

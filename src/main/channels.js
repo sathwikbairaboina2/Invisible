@@ -42,6 +42,7 @@ const CHANNELS = {
 
   // audio worker -> main
   AUDIO_UTTERANCE: 'audio:utterance',
+  AUDIO_UTTERANCE_PARTIAL: 'audio:utterance-partial',
   AUDIO_SPEECH_START: 'audio:speech-start',
   AUDIO_LEVEL: 'audio:level',
   AUDIO_ERROR: 'audio:error',
@@ -92,6 +93,7 @@ const RENDERER_INVOKE = [
 /** Channels the audio worker is allowed to send on. */
 const AUDIO_SEND = [
   CHANNELS.AUDIO_UTTERANCE,
+  CHANNELS.AUDIO_UTTERANCE_PARTIAL,
   CHANNELS.AUDIO_SPEECH_START,
   CHANNELS.AUDIO_LEVEL,
   CHANNELS.AUDIO_ERROR,

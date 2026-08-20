@@ -16,10 +16,22 @@ function createTranscriber({ transcribe, onTranscriptFinal } = {}) {
     });
 
   return async function transcriber(state) {
-    // The manual-ask shortcut re-runs a turn with no audio: the utterance is
-    // already known, and re-transcribing would both waste a call and append a
-    // duplicate transcript line for something the operator already saw.
-    if (!state.pcm) return { utterance: state.utterance ?? '' };
+    if (!state.pcm) {
+      // Speculative path: the utterance was transcribed during the VAD's
+      // redemption window and is being reused. Unlike the manual re-ask below,
+      // this is the turn's FIRST appearance, so it belongs in the transcript.
+      if (state.speculative && state.utterance) {
+        onTranscriptFinal?.({ speaker: state.speaker, text: state.utterance });
+        return {
+          utterance: state.utterance,
+          transcript: [{ speaker: state.speaker, text: state.utterance }],
+        };
+      }
+      // The manual-ask shortcut re-runs a turn with no audio: the utterance is
+      // already known, and re-transcribing would both waste a call and append a
+      // duplicate transcript line for something the operator already saw.
+      return { utterance: state.utterance ?? '' };
+    }
 
     const text = (await recognise(state.pcm, state.sampleRate ?? 16000)).trim();
 

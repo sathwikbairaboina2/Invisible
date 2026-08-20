@@ -102,6 +102,65 @@ test('a completed answer fires onFollowup with the predicted question', async ()
   assert.equal(followupSeen.text, 'And at scale?');
 });
 
+test('a matching speculation is reused instead of transcribing twice', async () => {
+  let transcribeCalls = 0;
+  const transcriptSeen = [];
+  const runtime = createAgentRuntime({
+    transcribe: async () => {
+      transcribeCalls += 1;
+      return 'Can you walk me through how you would shard that table?';
+    },
+    stream: async function* (state) {
+      transcriptSeen.push(...(state.transcript ?? []));
+      yield 'answer';
+    },
+  });
+
+  const pcm = new Float32Array(16);
+  runtime.speculate({ speaker: 'remote', pcm, sampleRate: 16000, partialId: 'remote-1' });
+  await runtime.submitUtterance({ speaker: 'remote', pcm, sampleRate: 16000, partialId: 'remote-1' });
+
+  assert.equal(transcribeCalls, 1, 'speculative transcription must be reused, not repeated');
+  assert.equal(
+    transcriptSeen.filter((t) => t.text.includes('shard that table')).length,
+    1,
+    'the reused utterance still lands in the transcript exactly once'
+  );
+});
+
+test('a stale or missing speculation falls back to normal transcription', async () => {
+  let transcribeCalls = 0;
+  const runtime = createAgentRuntime({
+    transcribe: async () => {
+      transcribeCalls += 1;
+      return 'Can you walk me through how you would shard that table?';
+    },
+    stream: async function* () { yield 'answer'; },
+  });
+
+  const pcm = new Float32Array(16);
+  runtime.speculate({ speaker: 'remote', pcm, sampleRate: 16000, partialId: 'remote-1' });
+  await runtime.submitUtterance({ speaker: 'remote', pcm, sampleRate: 16000, partialId: 'remote-2' });
+
+  assert.equal(transcribeCalls, 2, 'mismatched partialId must re-transcribe the real audio');
+});
+
+test('user-side speculation is ignored', async () => {
+  let transcribeCalls = 0;
+  const runtime = createAgentRuntime({
+    transcribe: async () => {
+      transcribeCalls += 1;
+      return 'text';
+    },
+    stream: async function* () { yield 'x'; },
+  });
+
+  runtime.speculate({ speaker: 'user', pcm: new Float32Array(4), sampleRate: 16000, partialId: 'u-1' });
+  await new Promise((resolve) => setTimeout(resolve, 10));
+
+  assert.equal(transcribeCalls, 0);
+});
+
 test('old turns are folded into a rolling summary that reaches later prompts', async () => {
   const summaries = [];
   let lastSeenSummary = null;

@@ -1139,13 +1139,26 @@ function registerIpc() {
    */
   ipcMain.on(CHANNELS.AUDIO_UTTERANCE, (_event, payload) => {
     log('utterance', payload?.speaker, `${payload?.durationMs}ms`,
-        `${payload?.pcm?.byteLength ?? 0}B`);
+        `${payload?.pcm?.byteLength ?? 0}B`,
+        payload?.partialId ? `reuse:${payload.partialId}` : '');
     if (!agent || !payload?.pcm) return;
     agent.submitUtterance({
       speaker: payload.speaker === 'user' ? 'user' : 'remote',
       pcm: new Float32Array(payload.pcm),
       sampleRate: payload.sampleRate ?? config.audio.sampleRate,
       durationMs: payload.durationMs ?? 0,
+      partialId: payload.partialId ?? null,
+    });
+  });
+
+  ipcMain.on(CHANNELS.AUDIO_UTTERANCE_PARTIAL, (_event, payload) => {
+    log('partial', payload?.speaker, `${payload?.durationMs}ms`, payload?.partialId);
+    if (!agent || !payload?.pcm) return;
+    agent.speculate({
+      speaker: payload.speaker === 'user' ? 'user' : 'remote',
+      pcm: new Float32Array(payload.pcm),
+      sampleRate: payload.sampleRate ?? config.audio.sampleRate,
+      partialId: payload.partialId,
     });
   });
 

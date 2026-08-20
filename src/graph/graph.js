@@ -97,12 +97,39 @@ function createAgentRuntime(options = {}) {
   let lastRemoteUtterance = '';
   let disposed = false;
 
+  /**
+   * One in-flight speculative transcription, started mid-silence before the
+   * VAD's redemption window has closed. Kept as a promise so a final
+   * utterance that arrives while whisper is still running awaits the result
+   * instead of transcribing the same audio twice.
+   * @type {{partialId: string, promise: Promise<string>} | null}
+   */
+  let speculation = null;
+
   function abortInFlight() {
     if (inFlight && !inFlight.signal.aborted) inFlight.abort();
   }
 
-  async function run({ speaker, pcm, sampleRate, utterance, forceRespond = false }) {
+  async function run({ speaker, pcm, sampleRate, utterance, forceRespond = false, partialId = null }) {
     if (disposed) return;
+
+    // Reuse a speculative transcription when the silence that triggered it is
+    // the same silence that ended the utterance. The audio only differs by
+    // trailing silence, which transcribes to nothing anyway.
+    let speculative = false;
+    if (partialId && speculation && speculation.partialId === partialId) {
+      try {
+        const text = (await speculation.promise).trim();
+        if (text) {
+          utterance = text;
+          pcm = null;
+          speculative = true;
+        }
+      } catch {
+        // Failed speculation just means the normal path below does the work.
+      }
+    }
+    speculation = null;
 
     // Only the other party's speech supersedes an answer in progress.
     //
@@ -136,6 +163,7 @@ function createAgentRuntime(options = {}) {
           profile: session.profile,
           stylePreset: session.stylePreset,
           summary,
+          speculative,
         },
         {
           configurable: {
@@ -155,7 +183,7 @@ function createAgentRuntime(options = {}) {
       transcript = result.transcript ?? transcript;
       // The transcriber appends at most one turn per run, and the window
       // truncation can make length deltas lie — count appends, not lengths.
-      if (pcm && result.utterance && transcript.length >= beforeLen) totalTurns += 1;
+      if ((pcm || speculative) && result.utterance && transcript.length >= beforeLen) totalTurns += 1;
       if (speaker === 'remote' && result.utterance) lastRemoteUtterance = result.utterance;
 
       // Fold turns that are about to fall out of the recent-history window
@@ -220,7 +248,21 @@ function createAgentRuntime(options = {}) {
   }
 
   return {
-    submitUtterance: ({ speaker, pcm, sampleRate }) => run({ speaker, pcm, sampleRate }),
+    submitUtterance: ({ speaker, pcm, sampleRate, partialId }) =>
+      run({ speaker, pcm, sampleRate, partialId }),
+
+    /**
+     * Start transcribing mid-silence, before the VAD has committed to ending
+     * the utterance. Fire-and-forget: the matching submitUtterance awaits the
+     * stored promise; an unmatched one is simply overwritten.
+     */
+    speculate: ({ speaker, pcm, sampleRate, partialId }) => {
+      if (disposed || speaker !== 'remote' || !pcm || !partialId) return;
+      const promise = transcribe
+        ? transcribe(pcm, sampleRate).catch(() => '')
+        : Promise.resolve('');
+      speculation = { partialId, promise };
+    },
 
     /** Manual-ask shortcut: re-run the last remote utterance, bypassing triage. */
     ask: (question) => {
