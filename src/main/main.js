@@ -19,6 +19,7 @@ const { createSerialQueue } = require('../whisper/queue');
 const { createOllamaClient } = require('../ollama/client');
 const { createRetrievalClient } = require('../qdrant/client');
 const { createSettingsStore } = require('./settings-store');
+const { SESSION_DEFAULTS, SESSION_EDITABLE, isValidMode } = require('./session-defaults');
 const { checkSetup } = require('./setup-check');
 
 const IS_DEV = !app.isPackaged || process.env.INVISIBLE_DEV === '1';
@@ -72,6 +73,8 @@ let agent = null;
 let sidecar = null;
 /** @type {ReturnType<typeof createSettingsStore> | null} */
 let settings = null;
+/** @type {ReturnType<typeof createSettingsStore> | null} */
+let sessionStore = null;
 
 const state = {
   visible: true,
@@ -87,6 +90,8 @@ const state = {
   llm: 'unknown',
   /** Retrieval readiness, mirrored to the overlay. */
   rag: 'unknown',
+  /** 'interview' | 'meeting'; mirrored to the overlay badge. */
+  mode: 'meeting',
 };
 
 /** Per-turn timing, keyed by turnId. Entries are deleted on turn end. */
@@ -468,6 +473,7 @@ function registerShortcuts() {
     [shortcuts.nudgeLeft, () => nudge(-config.overlay.nudgeStep, 0)],
     [shortcuts.nudgeRight, () => nudge(config.overlay.nudgeStep, 0)],
     [shortcuts.openSettings, () => createSettingsWindow()],
+    [shortcuts.toggleMode, () => toggleMode()],
   ];
 
   const failed = [];
@@ -502,6 +508,14 @@ function clearContext() {
   agent?.clear();
   sendToOverlay(CHANNELS.AGENT_CLEAR, {});
   log('context cleared');
+}
+
+function toggleMode() {
+  const next = sessionStore.get().mode === 'interview' ? 'meeting' : 'interview';
+  sessionStore.set({ mode: next });
+  state.mode = next;
+  pushStatus({});
+  log('mode', next);
 }
 
 /** Stop capture, drop all state, hide. One keystroke, no confirmation. */
@@ -729,6 +743,23 @@ function registerIpc() {
 
   ipcMain.handle(CHANNELS.SETTINGS_RESET, () => ({ ok: true, settings: settings.reset() }));
 
+  ipcMain.handle(CHANNELS.SESSION_GET, () => sessionStore.get());
+
+  ipcMain.handle(CHANNELS.SESSION_SET, (_event, patch) => {
+    // Mode is a closed enum; the store only checks "is a string".
+    if (patch && Object.hasOwn(patch, 'mode') && !isValidMode(patch.mode)) {
+      return { ok: false, error: 'mode must be "interview" or "meeting"' };
+    }
+    try {
+      const session = sessionStore.set(patch);
+      state.mode = session.mode;
+      pushStatus({});
+      return { ok: true, session };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  });
+
   ipcMain.on(CHANNELS.AGENT_CANCEL, () => agent?.cancel());
   ipcMain.on(CHANNELS.AGENT_CLEAR, () => clearContext());
 
@@ -827,6 +858,13 @@ if (!app.requestSingleInstanceLock()) {
         'audio.vad.negativeSpeechThreshold',
       ],
     });
+
+    sessionStore = createSettingsStore({
+      defaults: SESSION_DEFAULTS,
+      filePath: path.join(app.getPath('userData'), 'session.json'),
+      editable: SESSION_EDITABLE,
+    });
+    state.mode = sessionStore.get().mode;
 
     configureSession();
     createOverlayWindow();

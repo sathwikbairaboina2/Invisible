@@ -130,5 +130,9 @@ module.exports = {
     nudgeLeft: 'Control+Shift+Left',
     nudgeRight: 'Control+Shift+Right',
     openSettings: 'Control+Shift+,',
+    /** Flip interview <-> meeting. Persisted; survives restart. */
+    toggleMode: 'Control+Shift+M',
+    /** Open the typed-ask input on the overlay. */
+    askInput: 'Control+Shift+/',
   },
 };
