@@ -15,9 +15,10 @@ services:
     container_name: invisible-ollama
     restart: unless-stopped
     ports:
-      # 11435 on the host to stay clear of the two containers already using
-      # 11434. Inside the container Ollama still listens on its default port.
-      - "127.0.0.1:11435:11434"
+      # 11436 on the host. 11434 is taken by two other projects' containers, and
+      # 11435 - the original choice here - is now taken by a third. Inside the
+      # container Ollama still listens on its default port.
+      - "127.0.0.1:11436:11434"
     volumes:
       - invisible-ollama-models:/root/.ollama
     environment:
