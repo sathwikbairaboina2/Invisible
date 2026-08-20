@@ -708,7 +708,12 @@ function initAgent() {
     transcribe,
     search: retrieval.search,
     stream: ollama.stream,
+    followup: ollama.followup,
     getSession: () => sessionStore.get(),
+    onFollowup: (turnId, text) => {
+      log('followup', turnId, JSON.stringify(text));
+      sendToOverlay(CHANNELS.AGENT_FOLLOWUP, { turnId, text });
+    },
     // Every emitter below is the single path from graph -> UI.
     onTurnStart: (turn) => {
       // Time-to-first-token is the number the operator actually feels; steady

@@ -1,7 +1,7 @@
 'use strict';
 
 const { ChatOllama } = require('@langchain/ollama');
-const { buildMessages } = require('./prompt');
+const { buildMessages, buildFollowupMessages } = require('./prompt');
 
 /**
  * Thin wrapper over ChatOllama.
@@ -76,6 +76,26 @@ function createOllamaClient({
   }
 
   /**
+   * One-line follow-up prediction, run after an answer completes. Collected
+   * rather than streamed: a 15-word line arrives in one beat anyway.
+   *
+   * @param {{utterance: string, response: string, mode?: string}} state
+   * @param {AbortSignal} [signal]
+   * @returns {Promise<string>} predicted question, '' when aborted or empty
+   */
+  async function followup(state, signal) {
+    const messages = buildFollowupMessages(state);
+    const chunks = await chat.stream(messages, { signal });
+    let text = '';
+    for await (const chunk of chunks) {
+      if (signal?.aborted) return '';
+      text += typeof chunk === 'string' ? chunk : (chunk?.content ?? '');
+    }
+    // The model sometimes wraps the line in quotes despite the instruction.
+    return text.trim().replace(/^["']|["']$/g, '').split('\n')[0];
+  }
+
+  /**
    * Reachability plus "is the model actually pulled". Never throws — a dead
    * Ollama must degrade to a visible banner, not a failed launch.
    *
@@ -126,7 +146,7 @@ function createOllamaClient({
     }
   }
 
-  return { stream, probe, warmup };
+  return { stream, followup, probe, warmup };
 }
 
 module.exports = { createOllamaClient };

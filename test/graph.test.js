@@ -73,6 +73,22 @@ test('getSession snapshot reaches the generator state', async () => {
   assert.equal(seen.profile.company, 'Acme');
 });
 
+test('a completed answer fires onFollowup with the predicted question', async () => {
+  let followupSeen = null;
+  const runtime = createAgentRuntime({
+    transcribe: async () => 'question text',
+    stream: async function* () { yield 'the answer'; },
+    followup: async () => 'And at scale?',
+    onFollowup: (turnId, text) => { followupSeen = { turnId, text }; },
+  });
+
+  await runtime.ask('why?');
+
+  assert.ok(followupSeen, 'onFollowup never fired');
+  assert.match(followupSeen.turnId, /^turn-/);
+  assert.equal(followupSeen.text, 'And at scale?');
+});
+
 test('ignored utterances never reach the retriever or the generator', async () => {
   const visited = [];
   const app = buildGraph({

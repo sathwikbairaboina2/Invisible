@@ -3,7 +3,12 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { buildMessages, SYSTEM_PROMPT, resolveStyle } = require('../src/ollama/prompt');
+const {
+  buildMessages,
+  buildFollowupMessages,
+  SYSTEM_PROMPT,
+  resolveStyle,
+} = require('../src/ollama/prompt');
 
 test('the system prompt states the answer shape it needs to enforce', () => {
   // These constraints are the entire product decision for this phase. If any
@@ -171,6 +176,18 @@ test('bullets style keeps the original shape and stays the meeting default', () 
   const auto = buildMessages({ utterance: 'Q', mode: 'meeting', stylePreset: 'auto' });
   assert.match(explicit[0].content, /• /);
   assert.equal(explicit[0].content, auto[0].content);
+});
+
+test('followup prompt carries the question and the answer, and asks for one line', () => {
+  const messages = buildFollowupMessages({
+    utterance: 'How would you shard this table?',
+    response: 'Range-partition on tenant id.',
+    mode: 'interview',
+  });
+  assert.equal(messages.length, 2);
+  assert.match(messages[0].content, /one short line/i);
+  assert.match(messages[1].content, /How would you shard this table\?/);
+  assert.match(messages[1].content, /Range-partition on tenant id\./);
 });
 
 test('marks the current question distinctly from history', () => {

@@ -154,8 +154,33 @@ function buildMessages({
   ];
 }
 
+/**
+ * Tiny second prompt run after an answer completes: guess what gets asked
+ * next, so the operator can think one step ahead. Off the latency path.
+ *
+ * @param {{utterance: string, response: string, mode?: string}} args
+ */
+function buildFollowupMessages({ utterance, response, mode = 'interview' } = {}) {
+  const who = mode === 'meeting' ? 'the meeting' : 'the interviewer';
+  return [
+    {
+      role: 'system',
+      content: [
+        `Predict the single most likely next question from ${who}.`,
+        'Reply with one short line: just the question, under 15 words.',
+        'No preamble, no quotes, no explanation.',
+      ].join('\n'),
+    },
+    {
+      role: 'user',
+      content: `Question: ${utterance}\nAnswer given: ${response}\nMost likely follow-up:`,
+    },
+  ];
+}
+
 module.exports = {
   buildMessages,
+  buildFollowupMessages,
   resolveStyle,
   SYSTEM_PROMPT,
   MEETING_SYSTEM_PROMPT,

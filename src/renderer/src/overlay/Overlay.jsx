@@ -7,13 +7,14 @@ import { Transcript } from './Transcript.jsx';
 import './overlay.css';
 
 export function Overlay() {
-  const { status, turn, answer, transcript, error } = useAgent();
+  const { status, turn, answer, followup, transcript, error } = useAgent();
 
   return (
     <div className={status.interactive ? 'panel interactive' : 'panel'}>
       <StatusBar status={status} />
       <AskInput />
       <Answer answer={answer} streaming={turn.streaming} aborted={turn.aborted} />
+      {followup ? <div className="followup">next: {followup}</div> : null}
       <Transcript lines={transcript} />
       {error ? <div className="error">{`${error.scope}: ${error.message}`}</div> : null}
     </div>

@@ -16,9 +16,12 @@ export function useAgent() {
     rag: 'unknown',
     dropped: 0,
     mode: 'meeting',
+    stylePreset: 'auto',
+    style: 'bullets',
   });
   const [turn, setTurn] = useState({ id: null, streaming: false, aborted: false });
   const [answer, setAnswer] = useState('');
+  const [followup, setFollowup] = useState('');
   const [transcript, setTranscript] = useState([]);
   const [error, setError] = useState(null);
 
@@ -38,6 +41,15 @@ export function useAgent() {
         activeTurn.current = next.turnId;
         setTurn({ id: next.turnId, streaming: true, aborted: false });
         setAnswer('');
+        setFollowup('');
+      })
+    );
+
+    off.push(
+      api.onFollowup(({ turnId, text }) => {
+        // A superseded turn's late prediction must not attach to the new answer.
+        if (turnId !== activeTurn.current) return;
+        setFollowup(text);
       })
     );
 
@@ -80,5 +92,5 @@ export function useAgent() {
     return () => off.forEach((unsubscribe) => unsubscribe());
   }, []);
 
-  return { status, turn, answer, transcript, error };
+  return { status, turn, answer, followup, transcript, error };
 }

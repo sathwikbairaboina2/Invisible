@@ -101,6 +101,23 @@ body {
   background: rgba(46, 160, 100, 0.35);
 }
 
+.style-chip {
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--text-faint, rgba(255, 255, 255, 0.45));
+  border: 1px solid var(--divider, rgba(255, 255, 255, 0.12));
+  border-radius: 8px;
+  padding: 1px 6px;
+}
+
+.followup {
+  padding: calc(var(--unit) * 1.5) calc(var(--unit) * 3);
+  font-size: 11.5px;
+  font-style: italic;
+  color: var(--text-faint, rgba(255, 255, 255, 0.5));
+  border-bottom: 1px solid var(--divider, rgba(255, 255, 255, 0.08));
+}
+
 .meters {
   display: flex;
   gap: var(--unit);

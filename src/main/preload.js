@@ -41,6 +41,7 @@ contextBridge.exposeInMainWorld('invisible', {
   onTurnStart: (fn) => subscribe(CHANNELS.AGENT_TURN_START, fn),
   onToken: (fn) => subscribe(CHANNELS.AGENT_TOKEN, fn),
   onTurnEnd: (fn) => subscribe(CHANNELS.AGENT_TURN_END, fn),
+  onFollowup: (fn) => subscribe(CHANNELS.AGENT_FOLLOWUP, fn),
   onError: (fn) => subscribe(CHANNELS.AGENT_ERROR, fn),
   onTranscriptPartial: (fn) => subscribe(CHANNELS.TRANSCRIPT_PARTIAL, fn),
   onTranscriptFinal: (fn) => subscribe(CHANNELS.TRANSCRIPT_FINAL, fn),

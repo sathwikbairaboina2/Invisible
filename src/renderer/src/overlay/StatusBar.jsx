@@ -18,6 +18,9 @@ export function StatusBar({ status }) {
       <span className="mode-badge" data-mode={status.mode}>
         {status.mode === 'interview' ? 'INT' : 'MTG'}
       </span>
+      <span className="style-chip" title="answer style — Ctrl+Shift+. cycles">
+        {status.stylePreset === 'auto' ? `auto·${status.style}` : status.style}
+      </span>
       <span className="meters">
         <span className="meter" title="microphone">
           <i style={{ width: `${meterWidth(status, 'user')}%` }} />

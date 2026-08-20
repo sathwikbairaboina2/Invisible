@@ -62,8 +62,10 @@ function createAgentRuntime(options = {}) {
     transcribe,
     search,
     stream,
+    followup,
     getSession,
     onTurnStart,
+    onFollowup,
     onToken,
     onTurnEnd,
     onTranscriptFinal,
@@ -145,6 +147,22 @@ function createAgentRuntime(options = {}) {
       if (speaker === 'remote' && result.utterance) lastRemoteUtterance = result.utterance;
 
       if (started) onTurnEnd?.({ turnId, aborted: controller.signal.aborted });
+
+      // One-line follow-up prediction, after the answer is already on screen.
+      // Same signal: a new remote utterance that superseded this turn also
+      // makes its follow-up moot. Failures are swallowed — this is a bonus
+      // line, never worth an error banner.
+      if (started && !controller.signal.aborted && result.response && followup && onFollowup) {
+        try {
+          const predicted = await followup(
+            { utterance: result.utterance ?? utterance, response: result.response, mode: session.mode },
+            controller.signal
+          );
+          if (predicted && !controller.signal.aborted) onFollowup(turnId, predicted);
+        } catch {
+          /* prediction is best-effort */
+        }
+      }
     } catch (err) {
       if (started) onTurnEnd?.({ turnId, aborted: true });
 
