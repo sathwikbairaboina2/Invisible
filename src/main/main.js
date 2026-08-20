@@ -658,6 +658,7 @@ function initAgent() {
     transcribe,
     search: retrieval.search,
     stream: ollama.stream,
+    getSession: () => sessionStore.get(),
     // Every emitter below is the single path from graph -> UI.
     onTurnStart: (turn) => {
       // Time-to-first-token is the number the operator actually feels; steady

@@ -56,6 +56,23 @@ test('the transcript reducer caps history at the configured window', () => {
   assert.equal(acc[0].text, 'turn 10');
 });
 
+test('getSession snapshot reaches the generator state', async () => {
+  let seen = null;
+  const runtime = createAgentRuntime({
+    transcribe: async () => 'question text',
+    getSession: () => ({ mode: 'interview', profile: { company: 'Acme' } }),
+    stream: async function* (state) {
+      seen = { mode: state.mode, profile: state.profile };
+      yield 'x';
+    },
+  });
+
+  await runtime.ask('why?');
+
+  assert.equal(seen.mode, 'interview');
+  assert.equal(seen.profile.company, 'Acme');
+});
+
 test('ignored utterances never reach the retriever or the generator', async () => {
   const visited = [];
   const app = buildGraph({

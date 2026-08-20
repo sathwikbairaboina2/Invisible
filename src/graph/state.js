@@ -22,6 +22,12 @@ const AgentState = Annotation.Root({
   /** 'user' (microphone) or 'remote' (system loopback). */
   speaker: Annotation(),
 
+  /** 'interview' | 'meeting'; snapshotted per turn from the session store. */
+  mode: Annotation({ default: () => 'meeting' }),
+
+  /** Session profile snapshot, or null when none is set. */
+  profile: Annotation({ default: () => null }),
+
   /** Transcriber output for this turn. */
   utterance: Annotation(),
 

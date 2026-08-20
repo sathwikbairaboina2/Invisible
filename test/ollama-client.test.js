@@ -46,6 +46,28 @@ test('streams the model content out as plain strings', async () => {
   assert.deepEqual(tokens, ['Token ', 'bucket, ', 'Redis-backed.']);
 });
 
+test('stream passes mode and profile from state into the prompt', async () => {
+  const record = {};
+  const client = createOllamaClient({
+    baseUrl: 'http://x',
+    model: 'm',
+    chatImpl: fakeChat(['ok'], record),
+  });
+
+  await collect(
+    client.stream({
+      utterance: 'Q',
+      transcript: [],
+      retrieved: [],
+      mode: 'meeting',
+      profile: { title: 'Standup', attendees: '', agenda: '' },
+    })
+  );
+
+  assert.match(record.messages[0].content, /Standup/);
+  assert.match(record.messages[0].content, /live work meeting/);
+});
+
 test('passes the built prompt through to the model', async () => {
   const record = {};
   const client = createOllamaClient({

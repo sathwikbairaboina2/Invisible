@@ -62,6 +62,7 @@ function createAgentRuntime(options = {}) {
     transcribe,
     search,
     stream,
+    getSession,
     onTurnStart,
     onToken,
     onTurnEnd,
@@ -108,6 +109,10 @@ function createAgentRuntime(options = {}) {
     const turnId = `turn-${++turnCounter}`;
     let started = false;
 
+    // Snapshot per turn: a mid-meeting mode flip affects the next turn, never
+    // one already in flight.
+    const session = getSession?.() ?? {};
+
     try {
       const result = await app.invoke(
         {
@@ -118,6 +123,8 @@ function createAgentRuntime(options = {}) {
           utterance,
           transcript,
           forceRespond,
+          mode: session.mode,
+          profile: session.profile,
         },
         {
           configurable: {
