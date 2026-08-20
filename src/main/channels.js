@@ -14,6 +14,7 @@ const CHANNELS = {
   TRANSCRIPT_FINAL: 'transcript:final',
   STATUS: 'status:update',
   OVERLAY_MODE: 'overlay:mode',
+  OVERLAY_ASK_OPEN: 'overlay:ask-open',
 
   // overlay renderer -> main
   OVERLAY_READY: 'overlay:ready',
@@ -27,6 +28,8 @@ const CHANNELS = {
   SETTINGS_SET: 'settings:set',
   SETTINGS_RESET: 'settings:reset',
   SETUP_CHECK: 'setup:check',
+  SESSION_GET: 'session:get',
+  SESSION_SET: 'session:set',
   // renderer -> main, fire and forget
   SETTINGS_OPEN: 'settings:open',
 
@@ -52,6 +55,7 @@ const RENDERER_LISTEN = [
   CHANNELS.TRANSCRIPT_FINAL,
   CHANNELS.STATUS,
   CHANNELS.OVERLAY_MODE,
+  CHANNELS.OVERLAY_ASK_OPEN,
 ];
 
 /** Channels the overlay renderer is allowed to send on. */
@@ -75,6 +79,8 @@ const RENDERER_INVOKE = [
   CHANNELS.SETTINGS_SET,
   CHANNELS.SETTINGS_RESET,
   CHANNELS.SETUP_CHECK,
+  CHANNELS.SESSION_GET,
+  CHANNELS.SESSION_SET,
 ];
 
 /** Channels the audio worker is allowed to send on. */

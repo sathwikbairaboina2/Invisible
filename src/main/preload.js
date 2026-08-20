@@ -46,6 +46,7 @@ contextBridge.exposeInMainWorld('invisible', {
   onTranscriptFinal: (fn) => subscribe(CHANNELS.TRANSCRIPT_FINAL, fn),
   onStatus: (fn) => subscribe(CHANNELS.STATUS, fn),
   onMode: (fn) => subscribe(CHANNELS.OVERLAY_MODE, fn),
+  onAskOpen: (fn) => subscribe(CHANNELS.OVERLAY_ASK_OPEN, fn),
 
   ready: () => send(CHANNELS.OVERLAY_READY),
   cancel: () => send(CHANNELS.AGENT_CANCEL),
@@ -60,5 +61,9 @@ contextBridge.exposeInMainWorld('invisible', {
     get: () => invoke(CHANNELS.SETTINGS_GET),
     set: (patch) => invoke(CHANNELS.SETTINGS_SET, patch),
     reset: () => invoke(CHANNELS.SETTINGS_RESET),
+  },
+  session: {
+    get: () => invoke(CHANNELS.SESSION_GET),
+    set: (patch) => invoke(CHANNELS.SESSION_SET, patch),
   },
 });

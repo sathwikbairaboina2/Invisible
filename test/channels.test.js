@@ -44,6 +44,12 @@ test('send and listen lists do not overlap within a renderer', () => {
   }
 });
 
+test('session channels are invokable and ask-open is listenable', () => {
+  assert.ok(RENDERER_INVOKE.includes(CHANNELS.SESSION_GET));
+  assert.ok(RENDERER_INVOKE.includes(CHANNELS.SESSION_SET));
+  assert.ok(RENDERER_LISTEN.includes(CHANNELS.OVERLAY_ASK_OPEN));
+});
+
 test('every channel is reachable from at least one allow-list', () => {
   const reachable = new Set([
     ...RENDERER_LISTEN,
