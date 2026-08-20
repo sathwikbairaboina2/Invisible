@@ -475,6 +475,7 @@ function registerShortcuts() {
     [shortcuts.nudgeRight, () => nudge(config.overlay.nudgeStep, 0)],
     [shortcuts.openSettings, () => createSettingsWindow()],
     [shortcuts.toggleMode, () => toggleMode()],
+    [shortcuts.askInput, () => openAskInput()],
   ];
 
   const failed = [];
@@ -509,6 +510,13 @@ function clearContext() {
   agent?.clear();
   sendToOverlay(CHANNELS.AGENT_CLEAR, {});
   log('context cleared');
+}
+
+/** Hotkey path to a typed question: make the overlay clickable, open the box. */
+function openAskInput() {
+  if (!state.visible) setVisible(true);
+  setInteractive(true);
+  sendToOverlay(CHANNELS.OVERLAY_ASK_OPEN, {});
 }
 
 function toggleMode() {
