@@ -28,6 +28,9 @@ const AgentState = Annotation.Root({
   /** Session profile snapshot, or null when none is set. */
   profile: Annotation({ default: () => null }),
 
+  /** Answer shape preset; 'auto' resolves per mode in the prompt builder. */
+  stylePreset: Annotation({ default: () => 'auto' }),
+
   /** Transcriber output for this turn. */
   utterance: Annotation(),
 

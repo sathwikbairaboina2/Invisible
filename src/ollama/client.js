@@ -57,6 +57,7 @@ function createOllamaClient({
       historyTurns,
       mode: state.mode,
       profile: state.profile,
+      stylePreset: state.stylePreset,
     });
 
     // `await` is required: LangChain's Runnable.stream() returns a Promise of

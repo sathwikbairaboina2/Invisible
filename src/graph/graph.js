@@ -125,6 +125,7 @@ function createAgentRuntime(options = {}) {
           forceRespond,
           mode: session.mode,
           profile: session.profile,
+          stylePreset: session.stylePreset,
         },
         {
           configurable: {

@@ -19,8 +19,16 @@ const { createSerialQueue } = require('../whisper/queue');
 const { createOllamaClient } = require('../ollama/client');
 const { createRetrievalClient } = require('../qdrant/client');
 const { createSettingsStore } = require('./settings-store');
-const { SESSION_DEFAULTS, SESSION_EDITABLE, isValidMode } = require('./session-defaults');
+const {
+  SESSION_DEFAULTS,
+  SESSION_EDITABLE,
+  isValidMode,
+  isValidStylePreset,
+  STYLE_PRESETS,
+} = require('./session-defaults');
 const { audioChanged } = require('./audio-diff');
+const { effectiveAudio } = require('./audio-config');
+const { resolveStyle } = require('../ollama/prompt');
 const { checkSetup } = require('./setup-check');
 
 const IS_DEV = !app.isPackaged || process.env.INVISIBLE_DEV === '1';
@@ -93,6 +101,9 @@ const state = {
   rag: 'unknown',
   /** 'interview' | 'meeting'; mirrored to the overlay badge. */
   mode: 'meeting',
+  /** Raw preset ('auto' possible) and the shape it resolves to right now. */
+  stylePreset: 'auto',
+  style: 'bullets',
 };
 
 /** Per-turn timing, keyed by turnId. Entries are deleted on turn end. */
@@ -476,6 +487,7 @@ function registerShortcuts() {
     [shortcuts.openSettings, () => createSettingsWindow()],
     [shortcuts.toggleMode, () => toggleMode()],
     [shortcuts.askInput, () => openAskInput()],
+    [shortcuts.cycleStyle, () => cycleStyle()],
   ];
 
   const failed = [];
@@ -520,11 +532,20 @@ function openAskInput() {
 }
 
 function toggleMode() {
-  const next = sessionStore.get().mode === 'interview' ? 'meeting' : 'interview';
+  const before = sessionStore.get();
+  const next = before.mode === 'interview' ? 'meeting' : 'interview';
   sessionStore.set({ mode: next });
-  state.mode = next;
-  pushStatus({});
+  applySession(before);
   log('mode', next);
+}
+
+function cycleStyle() {
+  const before = sessionStore.get();
+  const index = STYLE_PRESETS.indexOf(before.stylePreset);
+  const next = STYLE_PRESETS[(index + 1) % STYLE_PRESETS.length];
+  sessionStore.set({ stylePreset: next });
+  applySession(before);
+  log('style', next, '->', state.style);
 }
 
 /** Tear down and rebuild both capture chains with current merged settings. */
@@ -535,8 +556,29 @@ function restartCapture() {
   // The worker's stopAll() is async and not awaited across the bridge; a short
   // beat keeps the new chains from racing the old tracks' teardown.
   setTimeout(() => {
-    sendToAudio(CHANNELS.AUDIO_START, { audio: settings.get().audio });
+    sendToAudio(CHANNELS.AUDIO_START, { audio: effectiveAudio(settings.get().audio, state.mode) });
   }, 250);
+}
+
+/**
+ * Sync process state from a session change and restart capture only when the
+ * change actually altered what the VAD should run with (a mode flip does when
+ * redemptionMsByMode differs and the operator has not pinned the slider).
+ */
+function applySession(before) {
+  const session = sessionStore.get();
+  state.mode = session.mode;
+  state.stylePreset = session.stylePreset;
+  state.style = resolveStyle(session.mode, session.stylePreset);
+
+  const audio = settings.get().audio;
+  if (audioChanged(
+    { audio: effectiveAudio(audio, before.mode) },
+    { audio: effectiveAudio(audio, session.mode) }
+  )) {
+    restartCapture();
+  }
+  pushStatus({});
 }
 
 /** Stop capture, drop all state, hide. One keystroke, no confirmation. */
@@ -773,14 +815,17 @@ function registerIpc() {
   ipcMain.handle(CHANNELS.SESSION_GET, () => sessionStore.get());
 
   ipcMain.handle(CHANNELS.SESSION_SET, (_event, patch) => {
-    // Mode is a closed enum; the store only checks "is a string".
+    // Mode and preset are closed enums; the store only checks "is a string".
     if (patch && Object.hasOwn(patch, 'mode') && !isValidMode(patch.mode)) {
       return { ok: false, error: 'mode must be "interview" or "meeting"' };
     }
+    if (patch && Object.hasOwn(patch, 'stylePreset') && !isValidStylePreset(patch.stylePreset)) {
+      return { ok: false, error: `stylePreset must be one of ${STYLE_PRESETS.join(', ')}` };
+    }
     try {
+      const before = sessionStore.get();
       const session = sessionStore.set(patch);
-      state.mode = session.mode;
-      pushStatus({});
+      applySession(before);
       return { ok: true, session };
     } catch (err) {
       return { ok: false, error: err.message };
@@ -892,6 +937,8 @@ if (!app.requestSingleInstanceLock()) {
       editable: SESSION_EDITABLE,
     });
     state.mode = sessionStore.get().mode;
+    state.stylePreset = sessionStore.get().stylePreset;
+    state.style = resolveStyle(state.mode, state.stylePreset);
 
     configureSession();
     createOverlayWindow();
@@ -933,7 +980,7 @@ if (!app.requestSingleInstanceLock()) {
     audioWin?.webContents.once('did-finish-load', () => {
       // Merged settings, not raw config: this is the line that makes the VAD
       // sliders in the settings window real. (Found dead 2026-08-20.)
-      sendToAudio(CHANNELS.AUDIO_START, { audio: settings.get().audio });
+      sendToAudio(CHANNELS.AUDIO_START, { audio: effectiveAudio(settings.get().audio, state.mode) });
     });
 
     app.on('activate', () => {

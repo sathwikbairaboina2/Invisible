@@ -31,6 +31,17 @@ module.exports = {
       negativeSpeechThreshold: 0.4,
       /** Silence tolerated mid-utterance before speech is considered over. */
       redemptionMs: 384,
+      /**
+       * Per-mode redemption. Interview questions carry real hesitations —
+       * measured 2026-08-20: the window absorbs gaps up to roughly its value
+       * minus 100 ms, and mid-question pauses run 500-1000 ms — so interviews
+       * tolerate more silence before an utterance closes. An explicit
+       * operator override of redemptionMs beats both of these.
+       */
+      redemptionMsByMode: {
+        interview: 640,
+        meeting: 384,
+      },
       /** Discard utterances shorter than this — coughs, keyboard clicks. */
       minSpeechMs: 192,
       /** Prepended context so the first phoneme is not clipped. */
@@ -134,5 +145,7 @@ module.exports = {
     toggleMode: 'Control+Shift+M',
     /** Open the typed-ask input on the overlay. */
     askInput: 'Control+Shift+/',
+    /** Cycle the answer style preset: auto, bullets, spoken, brief. */
+    cycleStyle: 'Control+Shift+.',
   },
 };
