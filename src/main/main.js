@@ -27,6 +27,7 @@ const {
   STYLE_PRESETS,
 } = require('./session-defaults');
 const { audioChanged } = require('./audio-diff');
+const { ingestCorpus } = require('../qdrant/ingest');
 const { effectiveAudio } = require('./audio-config');
 const { resolveStyle } = require('../ollama/prompt');
 const { checkSetup } = require('./setup-check');
@@ -816,6 +817,53 @@ function registerIpc() {
   });
 
   ipcMain.handle(CHANNELS.SETTINGS_RESET, () => ({ ok: true, settings: settings.reset() }));
+
+  // --- corpus ---------------------------------------------------------------
+  const corpusDir = () =>
+    path.isAbsolute(config.corpus.dir)
+      ? config.corpus.dir
+      : path.resolve(assetRoot(), config.corpus.dir);
+
+  const freshRetrieval = () =>
+    createRetrievalClient({
+      url: config.agent.qdrant.url,
+      collection: config.agent.qdrant.collection,
+      ollamaBaseUrl: config.agent.ollamaBaseUrl,
+      embedModel: config.agent.embedModel,
+    });
+
+  ipcMain.handle(CHANNELS.CORPUS_STATUS, async () => {
+    const probe = await freshRetrieval().probe();
+    return {
+      dir: corpusDir(),
+      ok: probe.ok,
+      points: probe.exists ? probe.points : 0,
+      error: probe.error,
+    };
+  });
+
+  let ingesting = false;
+  ipcMain.handle(CHANNELS.CORPUS_INGEST, async () => {
+    if (ingesting) return { ok: false, error: 'ingestion already running' };
+    ingesting = true;
+    try {
+      const result = await ingestCorpus({
+        dir: corpusDir(),
+        retrieval: freshRetrieval(),
+        maxChunkChars: config.corpus.maxChunkChars,
+        onProgress: (line) => log('ingest', line),
+      });
+      // The HUD's "no context" hint keys off state.rag; a fresh index should
+      // clear it without a restart.
+      state.rag = result.points > 0 ? 'ready' : 'empty';
+      pushStatus({});
+      return { ok: true, ...result };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    } finally {
+      ingesting = false;
+    }
+  });
 
   ipcMain.handle(CHANNELS.SESSION_GET, () => sessionStore.get());
 

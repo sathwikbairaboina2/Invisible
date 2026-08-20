@@ -67,4 +67,8 @@ contextBridge.exposeInMainWorld('invisible', {
     get: () => invoke(CHANNELS.SESSION_GET),
     set: (patch) => invoke(CHANNELS.SESSION_SET, patch),
   },
+  corpus: {
+    status: () => invoke(CHANNELS.CORPUS_STATUS),
+    ingest: () => invoke(CHANNELS.CORPUS_INGEST),
+  },
 });

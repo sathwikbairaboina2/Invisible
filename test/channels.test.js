@@ -50,6 +50,11 @@ test('session channels are invokable and ask-open is listenable', () => {
   assert.ok(RENDERER_LISTEN.includes(CHANNELS.OVERLAY_ASK_OPEN));
 });
 
+test('corpus channels are invokable', () => {
+  assert.ok(RENDERER_INVOKE.includes(CHANNELS.CORPUS_STATUS));
+  assert.ok(RENDERER_INVOKE.includes(CHANNELS.CORPUS_INGEST));
+});
+
 test('every channel is reachable from at least one allow-list', () => {
   const reachable = new Set([
     ...RENDERER_LISTEN,

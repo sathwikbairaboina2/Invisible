@@ -31,6 +31,8 @@ const CHANNELS = {
   SETUP_CHECK: 'setup:check',
   SESSION_GET: 'session:get',
   SESSION_SET: 'session:set',
+  CORPUS_STATUS: 'corpus:status',
+  CORPUS_INGEST: 'corpus:ingest',
   // renderer -> main, fire and forget
   SETTINGS_OPEN: 'settings:open',
 
@@ -83,6 +85,8 @@ const RENDERER_INVOKE = [
   CHANNELS.SETUP_CHECK,
   CHANNELS.SESSION_GET,
   CHANNELS.SESSION_SET,
+  CHANNELS.CORPUS_STATUS,
+  CHANNELS.CORPUS_INGEST,
 ];
 
 /** Channels the audio worker is allowed to send on. */
