@@ -68,6 +68,19 @@ test('stream passes mode and profile from state into the prompt', async () => {
   assert.match(record.messages[0].content, /live work meeting/);
 });
 
+test('stream passes the rolling summary through to the prompt', async () => {
+  const record = {};
+  const client = createOllamaClient({
+    baseUrl: 'http://x',
+    model: 'm',
+    chatImpl: fakeChat(['ok'], record),
+  });
+
+  await collect(client.stream({ utterance: 'Q', summary: 'Budget frozen until October.' }));
+
+  assert.match(record.messages[1].content, /Budget frozen until October\./);
+});
+
 test('stream passes the style preset through to the prompt', async () => {
   const record = {};
   const client = createOllamaClient({

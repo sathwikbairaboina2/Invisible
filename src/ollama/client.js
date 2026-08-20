@@ -1,7 +1,7 @@
 'use strict';
 
 const { ChatOllama } = require('@langchain/ollama');
-const { buildMessages, buildFollowupMessages } = require('./prompt');
+const { buildMessages, buildFollowupMessages, buildSummaryMessages } = require('./prompt');
 
 /**
  * Thin wrapper over ChatOllama.
@@ -58,6 +58,7 @@ function createOllamaClient({
       mode: state.mode,
       profile: state.profile,
       stylePreset: state.stylePreset,
+      summary: state.summary,
     });
 
     // `await` is required: LangChain's Runnable.stream() returns a Promise of
@@ -93,6 +94,24 @@ function createOllamaClient({
     }
     // The model sometimes wraps the line in quotes despite the instruction.
     return text.trim().replace(/^["']|["']$/g, '').split('\n')[0];
+  }
+
+  /**
+   * Rolling-summary refresh; same collect-don't-stream shape as followup.
+   *
+   * @param {{olderTurns: Array, previousSummary?: string, mode?: string}} state
+   * @param {AbortSignal} [signal]
+   * @returns {Promise<string>} updated summary, '' when aborted or empty
+   */
+  async function summarize(state, signal) {
+    const messages = buildSummaryMessages(state);
+    const chunks = await chat.stream(messages, { signal });
+    let text = '';
+    for await (const chunk of chunks) {
+      if (signal?.aborted) return '';
+      text += typeof chunk === 'string' ? chunk : (chunk?.content ?? '');
+    }
+    return text.trim();
   }
 
   /**
@@ -146,7 +165,7 @@ function createOllamaClient({
     }
   }
 
-  return { stream, followup, probe, warmup };
+  return { stream, followup, summarize, probe, warmup };
 }
 
 module.exports = { createOllamaClient };

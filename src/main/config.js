@@ -103,6 +103,11 @@ module.exports = {
     historyTurns: 8,
     /** Transcript turns retained in graph state. Older turns are dropped. */
     transcriptWindow: 40,
+    /**
+     * Rolling-summary cadence: turns falling out of the historyTurns window
+     * are folded into an <80-word running summary every this-many new turns.
+     */
+    summary: { everyTurns: 6 },
     qdrant: {
       url: process.env.QDRANT_URL || 'http://127.0.0.1:6333',
       collection: 'invisible_context',

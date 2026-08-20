@@ -710,6 +710,7 @@ function initAgent() {
     search: retrieval.search,
     stream: ollama.stream,
     followup: ollama.followup,
+    summarize: ollama.summarize,
     getSession: () => sessionStore.get(),
     onFollowup: (turnId, text) => {
       log('followup', turnId, JSON.stringify(text));

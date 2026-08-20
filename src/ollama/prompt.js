@@ -118,8 +118,15 @@ function buildMessages({
   mode = 'interview',
   profile = null,
   stylePreset = 'auto',
+  summary = '',
 } = {}) {
   const sections = [];
+
+  // Long meetings outlive the recent-turns window; the rolling summary is how
+  // a question about minute five still resolves at minute forty.
+  if (summary) {
+    sections.push(`Earlier in the conversation (summary):\n${summary}`);
+  }
 
   // Recent dialogue, so a follow-up like "and at scale?" resolves against what
   // came before it. Capped because the whole conversation would crowd out the
@@ -178,9 +185,41 @@ function buildFollowupMessages({ utterance, response, mode = 'interview' } = {})
   ];
 }
 
+/**
+ * Compress turns that are about to fall out of the recent-turns window into a
+ * short running summary, folding in whatever summary already existed.
+ *
+ * @param {{olderTurns: Array<{speaker: string, text: string}>,
+ *          previousSummary?: string, mode?: string}} args
+ */
+function buildSummaryMessages({ olderTurns = [], previousSummary = '', mode = 'meeting' } = {}) {
+  const lines = olderTurns.map((turn) => {
+    const label = turn.speaker === 'user' ? 'You' : mode === 'meeting' ? 'Them' : 'Interviewer';
+    return `${label}: ${turn.text}`;
+  });
+
+  const parts = [];
+  if (previousSummary) parts.push(`Summary so far:\n${previousSummary}`);
+  parts.push(`New dialogue to fold in:\n${lines.join('\n')}`);
+
+  return [
+    {
+      role: 'system',
+      content: [
+        'Maintain a running summary of a live conversation.',
+        'Merge the new dialogue into the summary so far.',
+        'Keep topics, decisions, names, and numbers. Drop filler.',
+        'Reply with the updated summary only, under 80 words, plain prose.',
+      ].join('\n'),
+    },
+    { role: 'user', content: parts.join('\n\n') },
+  ];
+}
+
 module.exports = {
   buildMessages,
   buildFollowupMessages,
+  buildSummaryMessages,
   resolveStyle,
   SYSTEM_PROMPT,
   MEETING_SYSTEM_PROMPT,

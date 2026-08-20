@@ -63,6 +63,7 @@ function createAgentRuntime(options = {}) {
     search,
     stream,
     followup,
+    summarize,
     getSession,
     onTurnStart,
     onFollowup,
@@ -84,6 +85,12 @@ function createAgentRuntime(options = {}) {
 
   /** Rolling transcript, owned here because each invoke() is stateless. */
   let transcript = [];
+  /** Rolling summary of turns older than the recent-history window. */
+  let summary = '';
+  /** Total turns ever appended; survives the transcript window's truncation. */
+  let totalTurns = 0;
+  /** Total-turn index the summary already covers. */
+  let summarizedThrough = 0;
   /** @type {AbortController | null} */
   let inFlight = null;
   /** Last remote utterance, so the manual-ask shortcut has something to use. */
@@ -128,6 +135,7 @@ function createAgentRuntime(options = {}) {
           mode: session.mode,
           profile: session.profile,
           stylePreset: session.stylePreset,
+          summary,
         },
         {
           configurable: {
@@ -143,8 +151,41 @@ function createAgentRuntime(options = {}) {
         }
       );
 
+      const beforeLen = transcript.length;
       transcript = result.transcript ?? transcript;
+      // The transcriber appends at most one turn per run, and the window
+      // truncation can make length deltas lie — count appends, not lengths.
+      if (pcm && result.utterance && transcript.length >= beforeLen) totalTurns += 1;
       if (speaker === 'remote' && result.utterance) lastRemoteUtterance = result.utterance;
+
+      // Fold turns that are about to fall out of the recent-history window
+      // into the rolling summary. Off the latency path: the answer is already
+      // on screen. Failures leave the previous summary standing.
+      const historyTurns = config?.historyTurns ?? 8;
+      const everyTurns = config?.summary?.everyTurns ?? 6;
+      const cutTotal = totalTurns - historyTurns;
+      if (summarize && cutTotal - summarizedThrough >= everyTurns) {
+        // Map total-turn coordinates onto the (possibly truncated) array.
+        const offset = totalTurns - transcript.length;
+        const olderTurns = transcript.slice(
+          Math.max(0, summarizedThrough - offset),
+          Math.max(0, cutTotal - offset)
+        );
+        if (olderTurns.length > 0) {
+          try {
+            const updated = await summarize(
+              { olderTurns, previousSummary: summary, mode: session.mode },
+              controller.signal
+            );
+            if (updated) {
+              summary = updated;
+              summarizedThrough = cutTotal;
+            }
+          } catch {
+            /* summary is best-effort; the next turn retries */
+          }
+        }
+      }
 
       if (started) onTurnEnd?.({ turnId, aborted: controller.signal.aborted });
 
@@ -202,6 +243,9 @@ function createAgentRuntime(options = {}) {
       abortInFlight();
       transcript = [];
       lastRemoteUtterance = '';
+      summary = '';
+      totalTurns = 0;
+      summarizedThrough = 0;
     },
 
     transcriptLength: () => transcript.length,

@@ -31,6 +31,9 @@ const AgentState = Annotation.Root({
   /** Answer shape preset; 'auto' resolves per mode in the prompt builder. */
   stylePreset: Annotation({ default: () => 'auto' }),
 
+  /** Rolling summary of turns that fell out of the recent-history window. */
+  summary: Annotation({ default: () => '' }),
+
   /** Transcriber output for this turn. */
   utterance: Annotation(),
 

@@ -6,6 +6,7 @@ const assert = require('node:assert/strict');
 const {
   buildMessages,
   buildFollowupMessages,
+  buildSummaryMessages,
   SYSTEM_PROMPT,
   resolveStyle,
 } = require('../src/ollama/prompt');
@@ -188,6 +189,40 @@ test('followup prompt carries the question and the answer, and asks for one line
   assert.match(messages[0].content, /one short line/i);
   assert.match(messages[1].content, /How would you shard this table\?/);
   assert.match(messages[1].content, /Range-partition on tenant id\./);
+});
+
+test('a running summary is injected before the recent dialogue', () => {
+  const messages = buildMessages({
+    utterance: 'What did we decide about the budget?',
+    summary: 'Discussed Q3 hiring; budget frozen until October.',
+    transcript: [{ speaker: 'remote', text: 'Moving on.' }],
+  });
+  const user = messages[1].content;
+  assert.match(user, /Earlier in the conversation[\s\S]*budget frozen until October/);
+  assert.ok(
+    user.indexOf('Earlier in the conversation') < user.indexOf('Conversation so far'),
+    'summary must precede the recent turns'
+  );
+});
+
+test('no summary section when the summary is empty', () => {
+  const messages = buildMessages({ utterance: 'Q', summary: '' });
+  assert.doesNotMatch(messages[1].content, /Earlier in the conversation/);
+});
+
+test('summary prompt folds older turns into the previous summary within the word cap', () => {
+  const messages = buildSummaryMessages({
+    previousSummary: 'Talked about sharding.',
+    olderTurns: [
+      { speaker: 'remote', text: 'What about caching?' },
+      { speaker: 'user', text: 'Redis with a token bucket.' },
+    ],
+    mode: 'meeting',
+  });
+  assert.equal(messages.length, 2);
+  assert.match(messages[0].content, /80 words/);
+  assert.match(messages[1].content, /Talked about sharding\./);
+  assert.match(messages[1].content, /Redis with a token bucket\./);
 });
 
 test('marks the current question distinctly from history', () => {

@@ -89,6 +89,37 @@ test('a completed answer fires onFollowup with the predicted question', async ()
   assert.equal(followupSeen.text, 'And at scale?');
 });
 
+test('old turns are folded into a rolling summary that reaches later prompts', async () => {
+  const summaries = [];
+  let lastSeenSummary = null;
+
+  const runtime = createAgentRuntime({
+    config: { historyTurns: 4, summary: { everyTurns: 3 } },
+    transcribe: async () => 'Can you walk me through how you would shard that table?',
+    stream: async function* (state) {
+      lastSeenSummary = state.summary;
+      yield 'answer';
+    },
+    summarize: async ({ olderTurns, previousSummary }) => {
+      summaries.push({ olderTurns, previousSummary });
+      return `summary v${summaries.length}`;
+    },
+  });
+
+  const pcm = new Float32Array(16);
+  for (let i = 0; i < 10; i++) {
+    await runtime.submitUtterance({ speaker: 'remote', pcm, sampleRate: 16000 });
+  }
+
+  assert.ok(summaries.length >= 2, 'summarize should run more than once over 10 turns');
+  assert.ok(summaries[0].olderTurns.length > 0, 'older turns were not handed over');
+  assert.equal(summaries[0].previousSummary, '', 'first pass starts from nothing');
+  assert.equal(summaries[1].previousSummary, 'summary v1', 'later passes fold the prior summary');
+  // The summary is refreshed after a turn completes, so the prompt sees the
+  // version produced by an earlier turn — any version, but a real one.
+  assert.match(lastSeenSummary, /^summary v\d+$/);
+});
+
 test('ignored utterances never reach the retriever or the generator', async () => {
   const visited = [];
   const app = buildGraph({
