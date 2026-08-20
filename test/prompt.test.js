@@ -87,6 +87,61 @@ test('omits the context section entirely when retrieval found nothing', () => {
   assert.doesNotMatch(messages[1].content, /context/i);
 });
 
+test('interview mode with profile names the role and company in the system prompt', () => {
+  const messages = buildMessages({
+    utterance: 'Why hashing?',
+    mode: 'interview',
+    profile: { company: 'Acme', role: 'Platform Engineer', jobDescription: 'Build rate limiters.' },
+  });
+  assert.equal(messages[0].role, 'system');
+  assert.match(messages[0].content, /Platform Engineer/);
+  assert.match(messages[0].content, /Acme/);
+  assert.match(messages[0].content, /Build rate limiters\./);
+});
+
+test('meeting mode uses the meeting system prompt with title and agenda', () => {
+  const messages = buildMessages({
+    utterance: 'What did we decide?',
+    mode: 'meeting',
+    profile: { title: 'Q3 planning', attendees: 'Ana, Raj', agenda: 'Budget review' },
+  });
+  assert.match(messages[0].content, /Q3 planning/);
+  assert.match(messages[0].content, /Ana, Raj/);
+  assert.match(messages[0].content, /Budget review/);
+  assert.doesNotMatch(messages[0].content, /interview/i);
+});
+
+test('empty profile falls back to the generic prompts', () => {
+  const generic = buildMessages({ utterance: 'Q' });
+  const withEmpty = buildMessages({ utterance: 'Q', mode: 'interview', profile: {
+    company: '', role: '', jobDescription: '', title: '', attendees: '', agenda: '',
+  }});
+  assert.equal(withEmpty[0].content, generic[0].content);
+});
+
+test('job description is truncated to the cap', () => {
+  const long = 'x'.repeat(5000);
+  const messages = buildMessages({
+    utterance: 'Q',
+    mode: 'interview',
+    profile: { company: 'A', role: 'B', jobDescription: long },
+  });
+  assert.ok(messages[0].content.length < 3000, 'JD must be truncated, not embedded whole');
+});
+
+test('meeting mode labels speakers neutrally', () => {
+  const messages = buildMessages({
+    utterance: 'And next steps?',
+    mode: 'meeting',
+    transcript: [
+      { speaker: 'remote', text: 'Budget is frozen.' },
+      { speaker: 'user', text: 'Understood.' },
+    ],
+  });
+  assert.match(messages[1].content, /Them: Budget is frozen\./);
+  assert.match(messages[1].content, /You: Understood\./);
+});
+
 test('marks the current question distinctly from history', () => {
   const messages = buildMessages({
     utterance: 'Why not use a queue?',
