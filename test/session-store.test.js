@@ -11,6 +11,8 @@ const {
   SESSION_DEFAULTS,
   SESSION_EDITABLE,
   isValidMode,
+  isValidStylePreset,
+  STYLE_PRESETS,
 } = require('../src/main/session-defaults');
 
 function tempFile() {
@@ -67,6 +69,24 @@ test('corrupt session file degrades to defaults', () => {
   const filePath = tempFile();
   fs.writeFileSync(filePath, '{not json', 'utf8');
   assert.equal(makeStore(filePath).get().mode, 'meeting');
+});
+
+test('style preset defaults to auto and persists', () => {
+  const filePath = tempFile();
+  assert.equal(makeStore(filePath).get().stylePreset, 'auto');
+  makeStore(filePath).set({ stylePreset: 'brief' });
+  assert.equal(makeStore(filePath).get().stylePreset, 'brief');
+});
+
+test('style preset cycle order is auto, bullets, spoken, brief', () => {
+  assert.deepEqual(STYLE_PRESETS, ['auto', 'bullets', 'spoken', 'brief']);
+});
+
+test('isValidStylePreset accepts exactly the four literals', () => {
+  for (const preset of STYLE_PRESETS) assert.equal(isValidStylePreset(preset), true);
+  assert.equal(isValidStylePreset('long'), false);
+  assert.equal(isValidStylePreset(''), false);
+  assert.equal(isValidStylePreset(undefined), false);
 });
 
 test('isValidMode accepts exactly the two literals', () => {

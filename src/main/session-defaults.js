@@ -9,6 +9,11 @@
 const SESSION_DEFAULTS = {
   /** 'interview' | 'meeting' */
   mode: 'meeting',
+  /**
+   * Answer shape: 'auto' resolves per mode (interview → spoken, meeting →
+   * bullets); the rest pin a shape regardless of mode.
+   */
+  stylePreset: 'auto',
   profile: {
     // Interview mode
     company: '',
@@ -24,6 +29,7 @@ const SESSION_DEFAULTS = {
 /** Every leaf is operator-editable; the store rejects anything else. */
 const SESSION_EDITABLE = [
   'mode',
+  'stylePreset',
   'profile.company',
   'profile.role',
   'profile.jobDescription',
@@ -37,4 +43,17 @@ function isValidMode(value) {
   return value === 'interview' || value === 'meeting';
 }
 
-module.exports = { SESSION_DEFAULTS, SESSION_EDITABLE, isValidMode };
+/** Cycle order for the style hotkey; index 0 is the default. */
+const STYLE_PRESETS = ['auto', 'bullets', 'spoken', 'brief'];
+
+function isValidStylePreset(value) {
+  return STYLE_PRESETS.includes(value);
+}
+
+module.exports = {
+  SESSION_DEFAULTS,
+  SESSION_EDITABLE,
+  isValidMode,
+  STYLE_PRESETS,
+  isValidStylePreset,
+};
