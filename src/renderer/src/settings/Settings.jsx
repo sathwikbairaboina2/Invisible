@@ -96,6 +96,7 @@ const SHORTCUTS = [
   ['Answer clipboard text', 'Ctrl+Shift+;'],
   ['Jump overlay to next corner', 'Ctrl+Shift+O'],
   ['Resume capture after panic', "Ctrl+Shift+'"],
+  ['Answer what the screen shows (OCR)', 'Ctrl+Shift+G'],
 ];
 
 const read = (object, path) => path.split('.').reduce((node, key) => node?.[key], object);

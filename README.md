@@ -103,6 +103,7 @@ Without a corpus the app works fine; answers are simply less specific.
 | `Ctrl+Shift+;` | Answer the text currently on the clipboard |
 | `Ctrl+Shift+O` | Jump the overlay to the next screen corner |
 | `Ctrl+Shift+'` | Resume capture after panic |
+| `Ctrl+Shift+G` | OCR the screen and answer what it asks |
 
 ---
 

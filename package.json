@@ -19,6 +19,7 @@
     "ollama:pull": "docker exec invisible-ollama ollama pull qwen2.5-coder:14b-instruct-q4_K_M",
     "embed:pull": "docker exec invisible-ollama ollama pull nomic-embed-text",
     "ingest": "node scripts/ingest-corpus.js",
+    "replay": "node scripts/replay-interview.js",
     "postinstall": "node scripts/copy-vendor.js"
   },
   "engines": {

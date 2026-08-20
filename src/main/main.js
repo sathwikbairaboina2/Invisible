@@ -590,6 +590,7 @@ function registerShortcuts() {
     [shortcuts.askClipboard, () => askClipboard()],
     [shortcuts.cycleCorner, () => cycleCorner()],
     [shortcuts.resumeCapture, () => restartCapture()],
+    [shortcuts.askScreen, () => askScreen()],
   ];
 
   const failed = [];
@@ -673,6 +674,68 @@ function askClipboard() {
   log('clipboard ask', `${text.length} chars`);
   if (!state.visible) setVisible(true);
   agent?.ask(text);
+}
+
+/**
+ * OCR whatever is on the primary screen and answer it — a coding problem in a
+ * shared editor, a question on a slide. The overlay itself is excluded from
+ * capture by display affinity, so its own answer never feeds back in. OCR is
+ * the OS engine via PowerShell: no bundled dependency, ~1-2 s end to end.
+ */
+let ocrRunning = false;
+async function askScreen() {
+  if (ocrRunning) return;
+  ocrRunning = true;
+  try {
+    const display = screen.getPrimaryDisplay();
+    const sources = await desktopCapturer.getSources({
+      types: ['screen'],
+      thumbnailSize: {
+        width: display.size.width * display.scaleFactor,
+        height: display.size.height * display.scaleFactor,
+      },
+    });
+    const source =
+      sources.find((entry) => String(entry.display_id) === String(display.id)) ?? sources[0];
+    if (!source) throw new Error('no screen source available');
+
+    const png = source.thumbnail.toPNG();
+    const fs = require('node:fs');
+    const os = require('node:os');
+    const shot = path.join(os.tmpdir(), `invisible-ocr-${Date.now()}.png`);
+    fs.writeFileSync(shot, png);
+
+    const { execFile } = require('node:child_process');
+    const script = path.join(assetRoot(), 'scripts', 'ocr.ps1');
+    const text = await new Promise((resolve, reject) => {
+      execFile(
+        'powershell',
+        ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script, '-ImagePath', shot],
+        { timeout: 15000 },
+        (err, stdout) => (err ? reject(err) : resolve(String(stdout)))
+      );
+    }).finally(() => {
+      try {
+        fs.unlinkSync(shot);
+      } catch {
+        /* temp file; best effort */
+      }
+    });
+
+    const question = text.replace(/\s+/g, ' ').trim().slice(0, 2000);
+    if (!question) {
+      log('screen ask: OCR found no text');
+      return;
+    }
+    log('screen ask', `${question.length} chars`);
+    if (!state.visible) setVisible(true);
+    agent?.ask(`This text was captured from the screen. Answer what it asks:\n${question}`);
+  } catch (err) {
+    log('screen ask failed:', err.message);
+    sendToOverlay(CHANNELS.AGENT_ERROR, { scope: 'ocr', message: err.message });
+  } finally {
+    ocrRunning = false;
+  }
 }
 
 /** Hotkey path to a typed question: make the overlay clickable, open the box. */

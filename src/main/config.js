@@ -162,5 +162,7 @@ module.exports = {
     cycleCorner: 'Control+Shift+O',
     /** Restart capture — the way back from panic without relaunching. */
     resumeCapture: "Control+Shift+'",
+    /** OCR the primary screen and answer whatever it asks. */
+    askScreen: 'Control+Shift+G',
   },
 };

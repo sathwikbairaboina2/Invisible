@@ -24,6 +24,12 @@ files:
 
 asar: true
 
+# Real files beside the exe (not inside asar): PowerShell must read the OCR
+# script from disk, same reason the whisper binary lives out here.
+extraFiles:
+  - from: scripts/ocr.ps1
+    to: scripts/ocr.ps1
+
 win:
   target:
     - target: nsis
