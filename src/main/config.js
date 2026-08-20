@@ -152,5 +152,7 @@ module.exports = {
     askInput: 'Control+Shift+/',
     /** Cycle the answer style preset: auto, bullets, spoken, brief. */
     cycleStyle: 'Control+Shift+.',
+    /** Write the meeting log to Documents/Invisible and reveal the file. */
+    exportMeeting: 'Control+Shift+E',
   },
 };

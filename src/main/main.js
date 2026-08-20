@@ -8,6 +8,7 @@ const {
   desktopCapturer,
   session,
   screen,
+  shell,
 } = require('electron');
 const path = require('node:path');
 
@@ -28,6 +29,8 @@ const {
 } = require('./session-defaults');
 const { audioChanged } = require('./audio-diff');
 const { ingestCorpus } = require('../qdrant/ingest');
+const { createMeetingLog } = require('./meeting-log');
+const { renderExport } = require('./export');
 const { effectiveAudio } = require('./audio-config');
 const { resolveStyle } = require('../ollama/prompt');
 const { checkSetup } = require('./setup-check');
@@ -109,6 +112,9 @@ const state = {
 
 /** Per-turn timing, keyed by turnId. Entries are deleted on turn end. */
 const turnMetrics = new Map();
+
+/** Everything the post-meeting export needs; wiped by panic and clear. */
+const meetingLog = createMeetingLog();
 
 // ---------------------------------------------------------------------------
 // Small helpers
@@ -489,6 +495,7 @@ function registerShortcuts() {
     [shortcuts.toggleMode, () => toggleMode()],
     [shortcuts.askInput, () => openAskInput()],
     [shortcuts.cycleStyle, () => cycleStyle()],
+    [shortcuts.exportMeeting, () => exportMeeting()],
   ];
 
   const failed = [];
@@ -521,8 +528,42 @@ function registerShortcuts() {
 
 function clearContext() {
   agent?.clear();
+  meetingLog.clear();
   sendToOverlay(CHANNELS.AGENT_CLEAR, {});
   log('context cleared');
+}
+
+/** Write the meeting log as markdown and reveal it in the file manager. */
+function exportMeeting() {
+  const snapshot = meetingLog.snapshot();
+  if (snapshot.transcript.length === 0 && snapshot.qa.length === 0) {
+    log('export skipped: nothing recorded yet');
+    return;
+  }
+  const markdown = renderExport({
+    snapshot,
+    session: sessionStore.get(),
+    summary: agent?.getSummary?.() ?? '',
+  });
+
+  const stamp = new Date(snapshot.startedAt)
+    .toISOString()
+    .slice(0, 16)
+    .replace('T', '-')
+    .replace(':', '');
+  const dir = path.join(app.getPath('documents'), 'Invisible');
+  const file = path.join(dir, `${sessionStore.get().mode}-${stamp}.md`);
+
+  try {
+    require('node:fs').mkdirSync(dir, { recursive: true });
+    require('node:fs').writeFileSync(file, markdown, 'utf8');
+    log('exported', file);
+    // Opening Explorer at the file IS the success feedback.
+    shell.showItemInFolder(file);
+  } catch (err) {
+    log('export failed:', err.message);
+    sendToOverlay(CHANNELS.AGENT_ERROR, { scope: 'export', message: err.message });
+  }
 }
 
 /** Hotkey path to a typed question: make the overlay clickable, open the box. */
@@ -588,6 +629,7 @@ function panic() {
   state.capturing = false;
   agent?.cancel();
   agent?.clear();
+  meetingLog.clear();
   setVisible(false);
   log('panic');
 }
@@ -714,6 +756,7 @@ function initAgent() {
     getSession: () => sessionStore.get(),
     onFollowup: (turnId, text) => {
       log('followup', turnId, JSON.stringify(text));
+      meetingLog.addFollowup(turnId, text);
       sendToOverlay(CHANNELS.AGENT_FOLLOWUP, { turnId, text });
     },
     // Every emitter below is the single path from graph -> UI.
@@ -723,6 +766,7 @@ function initAgent() {
       // regression shows up in the log rather than only as a vibe.
       turnMetrics.set(turn.turnId, { startedAt: Date.now(), firstTokenMs: null, tokens: 0 });
       log('turn start', turn.turnId, turn.speaker);
+      meetingLog.turnStart(turn);
       sendToOverlay(CHANNELS.AGENT_TURN_START, turn);
     },
     onToken: (turnId, token) => {
@@ -731,6 +775,7 @@ function initAgent() {
         if (metric.firstTokenMs === null) metric.firstTokenMs = Date.now() - metric.startedAt;
         metric.tokens += 1;
       }
+      meetingLog.addToken(turnId, token);
       sendToOverlay(CHANNELS.AGENT_TOKEN, { turnId, token });
     },
     onTurnEnd: (turn) => {
@@ -742,9 +787,13 @@ function initAgent() {
         turn.aborted ? 'aborted' : 'complete',
         metric ? `first-token ${metric.firstTokenMs}ms, ${metric.tokens} tokens in ${Date.now() - metric.startedAt}ms` : ''
       );
+      meetingLog.turnEnd(turn);
       sendToOverlay(CHANNELS.AGENT_TURN_END, turn);
     },
-    onTranscriptFinal: (seg) => sendToOverlay(CHANNELS.TRANSCRIPT_FINAL, seg),
+    onTranscriptFinal: (seg) => {
+      meetingLog.addTranscript(seg);
+      sendToOverlay(CHANNELS.TRANSCRIPT_FINAL, seg);
+    },
     onTranscriptPartial: (seg) => sendToOverlay(CHANNELS.TRANSCRIPT_PARTIAL, seg),
     onError: (err) => {
       // Logged as well as sent: without this, an agent-path failure is visible

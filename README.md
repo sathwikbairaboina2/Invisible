@@ -99,6 +99,7 @@ Without a corpus the app works fine; answers are simply less specific.
 | `Ctrl+Shift+M` | Toggle interview / meeting mode |
 | `Ctrl+Shift+/` | Type a question to the assistant |
 | `Ctrl+Shift+.` | Cycle answer style (auto / bullets / spoken / brief) |
+| `Ctrl+Shift+E` | Export meeting notes to Documents\Invisible |
 
 ---
 

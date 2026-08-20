@@ -142,10 +142,10 @@ function createAgentRuntime(options = {}) {
             signal: controller.signal,
             // Called by the generator, which only runs for turns that survived
             // triage — so a discarded utterance never opens an overlay bubble.
-            announce: () => {
+            announce: (announcedState) => {
               if (started) return;
               started = true;
-              onTurnStart?.({ turnId, speaker });
+              onTurnStart?.({ turnId, speaker, utterance: announcedState?.utterance ?? '' });
             },
           },
         }
@@ -249,6 +249,9 @@ function createAgentRuntime(options = {}) {
     },
 
     transcriptLength: () => transcript.length,
+
+    /** Rolling summary for the export; '' until enough turns accumulate. */
+    getSummary: () => summary,
 
     dispose: () => {
       abortInFlight();

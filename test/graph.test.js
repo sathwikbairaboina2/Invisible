@@ -73,6 +73,19 @@ test('getSession snapshot reaches the generator state', async () => {
   assert.equal(seen.profile.company, 'Acme');
 });
 
+test('onTurnStart carries the utterance being answered', async () => {
+  let turn = null;
+  const runtime = createAgentRuntime({
+    transcribe: async () => 'ignored',
+    stream: async function* () { yield 'x'; },
+    onTurnStart: (next) => { turn = next; },
+  });
+
+  await runtime.ask('why not a queue?');
+
+  assert.equal(turn.utterance, 'why not a queue?');
+});
+
 test('a completed answer fires onFollowup with the predicted question', async () => {
   let followupSeen = null;
   const runtime = createAgentRuntime({

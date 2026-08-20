@@ -34,8 +34,9 @@ function createGenerator({ stream, onToken, tokenDelayMs = 35 } = {}) {
     if (signal?.aborted) return { response: '' };
 
     // Announced here rather than at turn start: a turn that triage rejects
-    // never reaches this node, and must not open an empty bubble.
-    runtimeConfig?.configurable?.announce?.();
+    // never reaches this node, and must not open an empty bubble. The state
+    // rides along so listeners can pair the answer with its question.
+    runtimeConfig?.configurable?.announce?.(state);
 
     const source = stream ? stream(state, signal) : stubStream(state, signal);
 
