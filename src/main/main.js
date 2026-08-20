@@ -20,6 +20,7 @@ const { createOllamaClient } = require('../ollama/client');
 const { createRetrievalClient } = require('../qdrant/client');
 const { createSettingsStore } = require('./settings-store');
 const { SESSION_DEFAULTS, SESSION_EDITABLE, isValidMode } = require('./session-defaults');
+const { audioChanged } = require('./audio-diff');
 const { checkSetup } = require('./setup-check');
 
 const IS_DEV = !app.isPackaged || process.env.INVISIBLE_DEV === '1';
@@ -518,6 +519,18 @@ function toggleMode() {
   log('mode', next);
 }
 
+/** Tear down and rebuild both capture chains with current merged settings. */
+function restartCapture() {
+  sendToAudio(CHANNELS.AUDIO_STOP, {});
+  state.capturing = false;
+  pushStatus({});
+  // The worker's stopAll() is async and not awaited across the bridge; a short
+  // beat keeps the new chains from racing the old tracks' teardown.
+  setTimeout(() => {
+    sendToAudio(CHANNELS.AUDIO_START, { audio: settings.get().audio });
+  }, 250);
+}
+
 /** Stop capture, drop all state, hide. One keystroke, no confirmation. */
 function panic() {
   sendToAudio(CHANNELS.AUDIO_STOP, {});
@@ -735,7 +748,12 @@ function registerIpc() {
     // Returned rather than thrown: a rejected promise across the bridge loses
     // the message, and the message is the whole point of validation.
     try {
-      return { ok: true, settings: settings.set(patch) };
+      const before = settings.get();
+      const next = settings.set(patch);
+      // VAD values only exist inside the capture chains; a changed value that
+      // never restarts the chain is the bug this fixes.
+      if (audioChanged(before, next)) restartCapture();
+      return { ok: true, settings: next };
     } catch (err) {
       return { ok: false, error: err.message };
     }
@@ -904,7 +922,9 @@ if (!app.requestSingleInstanceLock()) {
 
     // Kick off capture once the worker's preload has attached.
     audioWin?.webContents.once('did-finish-load', () => {
-      sendToAudio(CHANNELS.AUDIO_START, { audio: config.audio });
+      // Merged settings, not raw config: this is the line that makes the VAD
+      // sliders in the settings window real. (Found dead 2026-08-20.)
+      sendToAudio(CHANNELS.AUDIO_START, { audio: settings.get().audio });
     });
 
     app.on('activate', () => {

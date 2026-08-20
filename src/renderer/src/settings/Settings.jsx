@@ -55,16 +55,14 @@ const SECTIONS = [
       {
         path: 'audio.vad.redemptionMs',
         label: 'End-of-speech wait',
-        hint: 'Silence tolerated mid-sentence. The largest single term in end-to-end latency.',
+        hint: 'Silence tolerated mid-sentence. Applies immediately (capture restarts).',
         step: 32,
-        restart: true,
       },
       {
         path: 'audio.vad.minSpeechMs',
         label: 'Minimum speech',
-        hint: 'Shorter bursts are discarded as coughs.',
+        hint: 'Shorter bursts are discarded as coughs. Applies immediately (capture restarts).',
         step: 32,
-        restart: true,
       },
     ],
   },
@@ -138,7 +136,6 @@ export function Settings() {
             <div className="row" key={row.path}>
               <div>
                 <span className="label">{row.label}</span>
-                {row.restart ? <span className="restart">restart</span> : null}
                 <span className="hint">{row.hint}</span>
               </div>
               <input
