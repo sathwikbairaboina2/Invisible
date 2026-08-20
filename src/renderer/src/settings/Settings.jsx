@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { SetupPanel } from './SetupPanel.jsx';
+import { SessionPanel } from './SessionPanel.jsx';
 import './settings.css';
 
 /**
@@ -128,6 +129,8 @@ export function Settings() {
           matters, and on a working machine it is one green line to scroll
           past. */}
       <SetupPanel />
+
+      <SessionPanel />
 
       {SECTIONS.map((section) => (
         <section key={section.title}>

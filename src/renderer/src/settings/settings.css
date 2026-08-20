@@ -144,13 +144,35 @@ button:focus-visible {
   color: var(--live);
 }
 
-.restart {
-  margin-left: calc(var(--unit) * 2);
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--warn);
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+/* ---- session panel ---- */
+
+.row textarea,
+.row select {
+  width: 100%;
+  background: #09090b;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-inner);
+  color: var(--text);
+  font: inherit;
+  padding: calc(var(--unit) * 1.5) calc(var(--unit) * 2);
+}
+
+.row textarea {
+  resize: vertical;
+  min-height: 64px;
+}
+
+.row textarea:focus-visible,
+.row select:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+  border-color: transparent;
+}
+
+/* Textarea rows stack label over field; 148px is too narrow for prose. */
+.row.stacked {
+  grid-template-columns: 1fr;
+  align-items: stretch;
 }
 
 /* ---- setup panel ---- */
