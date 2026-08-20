@@ -10,6 +10,9 @@ const {
   screen,
   shell,
   clipboard,
+  Tray,
+  Menu,
+  nativeImage,
 } = require('electron');
 const path = require('node:path');
 
@@ -31,6 +34,7 @@ const {
 const { audioChanged } = require('./audio-diff');
 const { ingestCorpus } = require('../qdrant/ingest');
 const { createMeetingLog } = require('./meeting-log');
+const { nextCorner, cornerBounds } = require('./overlay-position');
 const { renderExport } = require('./export');
 const { effectiveAudio } = require('./audio-config');
 const { resolveStyle } = require('../ollama/prompt');
@@ -89,6 +93,8 @@ let sidecar = null;
 let settings = null;
 /** @type {ReturnType<typeof createSettingsStore> | null} */
 let sessionStore = null;
+/** @type {Electron.Tray | null} */
+let tray = null;
 
 const state = {
   visible: true,
@@ -213,12 +219,96 @@ function setVisible(next) {
     overlayWin.hide();
   }
   pushStatus({});
+  refreshTray();
 }
 
 function nudge(dx, dy) {
   if (!overlayWin || overlayWin.isDestroyed()) return;
   const [x, y] = overlayWin.getPosition();
   overlayWin.setPosition(x + dx, y + dy, false);
+}
+
+/** Current corner in the cycle; the boot position is effectively top-right. */
+let corner = 'top-right';
+
+/**
+ * Jump the overlay to the next corner of whichever display it is on now —
+ * nudging it onto a second monitor first makes the cycle continue there.
+ */
+function cycleCorner() {
+  if (!overlayWin || overlayWin.isDestroyed()) return;
+  corner = nextCorner(corner);
+  const { workArea } = screen.getDisplayMatching(overlayWin.getBounds());
+  const [width, height] = overlayWin.getSize();
+  const { x, y } = cornerBounds(corner, workArea, { width, height }, config.overlay.margin);
+  overlayWin.setPosition(x, y, false);
+  log('corner', corner);
+}
+
+/** Applies the merged opacity setting; 1 is fully opaque. */
+function applyOpacity() {
+  if (!overlayWin || overlayWin.isDestroyed()) return;
+  overlayWin.setOpacity(settings.get().overlay.opacity);
+}
+
+/**
+ * Tray icon: the one mouse-driven surface, for the moments before a meeting
+ * when hotkeys are not yet muscle memory. The overlay itself stays keyboard-
+ * only. Rebuilt on every state change that its labels reflect.
+ */
+function buildTrayMenu() {
+  return Menu.buildFromTemplate([
+    { label: state.visible ? 'Hide overlay' : 'Show overlay', click: () => setVisible(!state.visible) },
+    {
+      label: `Mode: ${state.mode}`,
+      sublabel: 'toggle',
+      click: () => {
+        toggleMode();
+        refreshTray();
+      },
+    },
+    { type: 'separator' },
+    { label: 'Export meeting notes', click: () => exportMeeting() },
+    { label: 'Resume capture', click: () => restartCapture() },
+    {
+      label: 'Start services (Docker)',
+      click: () => {
+        // Fire and forget; the setup panel and status dot report the outcome.
+        const { spawn } = require('node:child_process');
+        const compose = path.join(assetRoot(), 'docker', 'compose.yml');
+        spawn('docker', ['compose', '-f', compose, 'up', '-d'], {
+          detached: true,
+          stdio: 'ignore',
+          shell: true,
+        }).unref();
+        log('tray: docker compose up requested');
+      },
+    },
+    { type: 'separator' },
+    {
+      label: 'Start with Windows',
+      type: 'checkbox',
+      checked: app.getLoginItemSettings().openAtLogin,
+      click: (item) => app.setLoginItemSettings({ openAtLogin: item.checked }),
+    },
+    { label: 'Settings', click: () => createSettingsWindow() },
+    { type: 'separator' },
+    { label: 'Quit Invisible', click: () => app.quit() },
+  ]);
+}
+
+function refreshTray() {
+  if (tray) tray.setContextMenu(buildTrayMenu());
+}
+
+function createTray() {
+  // __dirname-relative, not assetRoot(): the icon ships inside the app bundle
+  // (asar included), unlike the deliberately-external models and binaries.
+  const icon = nativeImage.createFromPath(path.join(__dirname, '..', '..', 'assets', 'tray.png'));
+  tray = new Tray(icon);
+  tray.setToolTip('Invisible');
+  tray.setContextMenu(buildTrayMenu());
+  tray.on('click', () => setVisible(!state.visible));
 }
 
 // ---------------------------------------------------------------------------
@@ -498,6 +588,8 @@ function registerShortcuts() {
     [shortcuts.cycleStyle, () => cycleStyle()],
     [shortcuts.exportMeeting, () => exportMeeting()],
     [shortcuts.askClipboard, () => askClipboard()],
+    [shortcuts.cycleCorner, () => cycleCorner()],
+    [shortcuts.resumeCapture, () => restartCapture()],
   ];
 
   const failed = [];
@@ -638,6 +730,7 @@ function applySession(before) {
     restartCapture();
   }
   pushStatus({});
+  refreshTray();
 }
 
 /** Stop capture, drop all state, hide. One keystroke, no confirmation. */
@@ -877,6 +970,7 @@ function registerIpc() {
       // VAD values only exist inside the capture chains; a changed value that
       // never restarts the chain is the bug this fixes.
       if (audioChanged(before, next)) restartCapture();
+      applyOpacity();
       return { ok: true, settings: next };
     } catch (err) {
       return { ok: false, error: err.message };
@@ -1048,6 +1142,7 @@ if (!app.requestSingleInstanceLock()) {
         'audio.vad.preSpeechPadMs',
         'audio.vad.positiveSpeechThreshold',
         'audio.vad.negativeSpeechThreshold',
+        'overlay.opacity',
       ],
     });
 
@@ -1063,6 +1158,8 @@ if (!app.requestSingleInstanceLock()) {
     configureSession();
     createOverlayWindow();
     createAudioWorker();
+    createTray();
+    applyOpacity();
 
     // Constructed before initAgent, which reads sidecar.baseUrl when it builds
     // the whisper client.

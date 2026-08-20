@@ -52,6 +52,17 @@ const SECTIONS = [
     ],
   },
   {
+    title: 'Overlay',
+    rows: [
+      {
+        path: 'overlay.opacity',
+        label: 'Opacity',
+        hint: 'Whole-panel transparency. 1 is opaque; 0.6 keeps slides readable behind it.',
+        step: 0.05,
+      },
+    ],
+  },
+  {
     title: 'Voice detection',
     rows: [
       {
@@ -83,6 +94,8 @@ const SHORTCUTS = [
   ['Cycle answer style', 'Ctrl+Shift+.'],
   ['Export meeting notes', 'Ctrl+Shift+E'],
   ['Answer clipboard text', 'Ctrl+Shift+;'],
+  ['Jump overlay to next corner', 'Ctrl+Shift+O'],
+  ['Resume capture after panic', "Ctrl+Shift+'"],
 ];
 
 const read = (object, path) => path.split('.').reduce((node, key) => node?.[key], object);

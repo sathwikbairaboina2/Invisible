@@ -11,6 +11,8 @@ module.exports = {
     margin: 24,
     /** Pixels moved per nudge shortcut press. */
     nudgeStep: 40,
+    /** Whole-window opacity; drop below 1 to keep slides readable behind it. */
+    opacity: 1,
   },
 
   audio: {
@@ -156,5 +158,9 @@ module.exports = {
     exportMeeting: 'Control+Shift+E',
     /** Answer the text currently on the clipboard. */
     askClipboard: 'Control+Shift+;',
+    /** Jump the overlay to the next screen corner. */
+    cycleCorner: 'Control+Shift+O',
+    /** Restart capture — the way back from panic without relaunching. */
+    resumeCapture: "Control+Shift+'",
   },
 };

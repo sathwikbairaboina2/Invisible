@@ -101,6 +101,8 @@ Without a corpus the app works fine; answers are simply less specific.
 | `Ctrl+Shift+.` | Cycle answer style (auto / bullets / spoken / brief) |
 | `Ctrl+Shift+E` | Export meeting notes to Documents\Invisible |
 | `Ctrl+Shift+;` | Answer the text currently on the clipboard |
+| `Ctrl+Shift+O` | Jump the overlay to the next screen corner |
+| `Ctrl+Shift+'` | Resume capture after panic |
 
 ---
 

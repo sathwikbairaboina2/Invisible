@@ -19,6 +19,7 @@ files:
   - src/qdrant/**/*
   - src/audio/**/*
   - src/renderer/dist/**/*
+  - assets/**/*
   - package.json
 
 asar: true
