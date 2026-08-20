@@ -96,6 +96,8 @@ Without a corpus the app works fine; answers are simply less specific.
 | `Ctrl+Shift+X` | Panic — stop capture, clear, hide |
 | `Ctrl+Shift+Arrows` | Move the overlay |
 | `Ctrl+Shift+,` | Settings |
+| `Ctrl+Shift+M` | Toggle interview / meeting mode |
+| `Ctrl+Shift+/` | Type a question to the assistant |
 
 ---
 

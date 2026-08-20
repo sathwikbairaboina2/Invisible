@@ -77,6 +77,8 @@ const SHORTCUTS = [
   ['Panic — hide and stop', 'Ctrl+Shift+X'],
   ['Move overlay', 'Ctrl+Shift+Arrows'],
   ['Settings', 'Ctrl+Shift+,'],
+  ['Toggle interview / meeting mode', 'Ctrl+Shift+M'],
+  ['Type a question', 'Ctrl+Shift+/'],
 ];
 
 const read = (object, path) => path.split('.').reduce((node, key) => node?.[key], object);
