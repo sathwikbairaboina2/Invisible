@@ -6,38 +6,70 @@
  * speaking, and a model that opens with "Great question!" has spent the
  * operator's entire attention budget before saying anything.
  */
-const SYSTEM_PROMPT = [
-  'You are a silent assistant on a heads-up display during a live technical interview.',
-  'The user is being interviewed right now and can only glance at you between sentences.',
-  '',
-  'Answer in exactly this shape:',
-  '- First line: the direct answer, under 12 words, no preamble.',
-  '- Then 3 or 4 lines, each starting with "• ", each under 12 words.',
-  '- Under 60 words total.',
-  '',
-  'Rules:',
-  '- No greeting, no "Great question", no restating the question.',
-  '- No markdown headers, no bold, no code fences.',
-  '- Name the actual algorithm, API, or trade-off. Concrete nouns beat hedging.',
-  '- If code is genuinely needed, one short inline line, no fences.',
-  '- If you do not know, say so on the first line instead of inventing.',
-].join('\n');
+const PERSONA = {
+  interview: [
+    'You are a silent assistant on a heads-up display during a live technical interview.',
+    'The user is being interviewed right now and can only glance at you between sentences.',
+  ],
+  meeting: [
+    'You are a silent assistant on a heads-up display during a live work meeting.',
+    'The user can only glance at you between sentences.',
+  ],
+};
 
-/** Same display constraints, different job: meetings want facts and actions. */
-const MEETING_SYSTEM_PROMPT = [
-  'You are a silent assistant on a heads-up display during a live work meeting.',
-  'The user can only glance at you between sentences.',
-  '',
-  'Answer in exactly this shape:',
-  '- First line: the direct answer, under 12 words, no preamble.',
-  '- Then 3 or 4 lines, each starting with "• ", each under 12 words.',
-  '- Under 60 words total.',
-  '',
-  'Rules:',
-  '- Short, factual, actionable. Name owners, dates, and numbers when known.',
-  '- No greeting, no restating the question, no markdown headers or fences.',
-  '- If you do not know, say so on the first line instead of inventing.',
-].join('\n');
+/** Answer shapes, cycled by the operator's style hotkey. */
+const SHAPE = {
+  bullets: [
+    'Answer in exactly this shape:',
+    '- First line: the direct answer, under 12 words, no preamble.',
+    '- Then 3 or 4 lines, each starting with "• ", each under 12 words.',
+    '- Under 60 words total.',
+  ],
+  spoken: [
+    'Answer in 2 or 3 complete spoken sentences, as the user would say them aloud,',
+    'first person. Under 60 words total. No bullet points, no list markers.',
+  ],
+  brief: [
+    'Answer in one direct line, under 15 words. Nothing else.',
+  ],
+};
+
+const RULES = {
+  interview: [
+    'Rules:',
+    '- No greeting, no "Great question", no restating the question.',
+    '- No markdown headers, no bold, no code fences.',
+    '- Name the actual algorithm, API, or trade-off. Concrete nouns beat hedging.',
+    '- If code is genuinely needed, one short inline line, no fences.',
+    '- If you do not know, say so on the first line instead of inventing.',
+  ],
+  meeting: [
+    'Rules:',
+    '- Short, factual, actionable. Name owners, dates, and numbers when known.',
+    '- No greeting, no restating the question, no markdown headers or fences.',
+    '- If you do not know, say so on the first line instead of inventing.',
+  ],
+};
+
+/**
+ * 'auto' follows the mode: an interviewer hears you speak the answer, so
+ * spoken sentences rehearse better; meetings want scannable facts.
+ */
+function resolveStyle(mode, stylePreset) {
+  if (stylePreset && stylePreset !== 'auto') return stylePreset;
+  return mode === 'interview' ? 'spoken' : 'bullets';
+}
+
+function systemFor(mode, style) {
+  const persona = PERSONA[mode] ?? PERSONA.interview;
+  const shape = SHAPE[style] ?? SHAPE.bullets;
+  const rules = RULES[mode] ?? RULES.interview;
+  return [...persona, '', ...shape, '', ...rules].join('\n');
+}
+
+/** Legacy composites; tests pin their wording, callers use buildMessages. */
+const SYSTEM_PROMPT = systemFor('interview', 'bullets');
+const MEETING_SYSTEM_PROMPT = systemFor('meeting', 'bullets');
 
 /** JD text is pasted wholesale; past this it crowds out the conversation. */
 const JD_MAX_CHARS = 1500;
@@ -74,7 +106,8 @@ function profileBlock(mode, profile) {
  *          retrieved?: Array<{text: string}>,
  *          historyTurns?: number,
  *          mode?: 'interview'|'meeting',
- *          profile?: object|null}} state
+ *          profile?: object|null,
+ *          stylePreset?: 'auto'|'bullets'|'spoken'|'brief'}} state
  * @returns {Array<{role: 'system'|'user', content: string}>}
  */
 function buildMessages({
@@ -84,6 +117,7 @@ function buildMessages({
   historyTurns = 8,
   mode = 'interview',
   profile = null,
+  stylePreset = 'auto',
 } = {}) {
   const sections = [];
 
@@ -112,7 +146,7 @@ function buildMessages({
   sections.push(`Answer this, in the shape described:\n${utterance}`);
 
   const system =
-    (mode === 'meeting' ? MEETING_SYSTEM_PROMPT : SYSTEM_PROMPT) + profileBlock(mode, profile);
+    systemFor(mode, resolveStyle(mode, stylePreset)) + profileBlock(mode, profile);
 
   return [
     { role: 'system', content: system },
@@ -122,6 +156,7 @@ function buildMessages({
 
 module.exports = {
   buildMessages,
+  resolveStyle,
   SYSTEM_PROMPT,
   MEETING_SYSTEM_PROMPT,
   SPEAKER_LABEL,

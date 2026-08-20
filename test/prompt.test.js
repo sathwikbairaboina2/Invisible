@@ -3,7 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { buildMessages, SYSTEM_PROMPT } = require('../src/ollama/prompt');
+const { buildMessages, SYSTEM_PROMPT, resolveStyle } = require('../src/ollama/prompt');
 
 test('the system prompt states the answer shape it needs to enforce', () => {
   // These constraints are the entire product decision for this phase. If any
@@ -21,9 +21,14 @@ test('emits a system message followed by a user message', () => {
 
   assert.equal(messages.length, 2);
   assert.equal(messages[0].role, 'system');
-  assert.equal(messages[0].content, SYSTEM_PROMPT);
+  // Default is interview + auto, which resolves to the spoken shape; pinning
+  // the exact bullets composite is done with an explicit stylePreset below.
+  assert.match(messages[0].content, /live technical interview/);
   assert.equal(messages[1].role, 'user');
   assert.match(messages[1].content, /How do you shard a table\?/);
+
+  const bullets = buildMessages({ utterance: 'Q', stylePreset: 'bullets' });
+  assert.equal(bullets[0].content, SYSTEM_PROMPT);
 });
 
 test('includes recent dialogue so follow-up questions resolve', () => {
@@ -140,6 +145,32 @@ test('meeting mode labels speakers neutrally', () => {
   });
   assert.match(messages[1].content, /Them: Budget is frozen\./);
   assert.match(messages[1].content, /You: Understood\./);
+});
+
+test('auto style resolves spoken for interviews and bullets for meetings', () => {
+  assert.equal(resolveStyle('interview', 'auto'), 'spoken');
+  assert.equal(resolveStyle('meeting', 'auto'), 'bullets');
+  assert.equal(resolveStyle('interview', 'brief'), 'brief');
+  assert.equal(resolveStyle('meeting', undefined), 'bullets');
+});
+
+test('spoken style asks for sentences, not bullets', () => {
+  const messages = buildMessages({ utterance: 'Q', mode: 'interview', stylePreset: 'spoken' });
+  assert.match(messages[0].content, /complete spoken sentences/i);
+  assert.doesNotMatch(messages[0].content, /• /);
+});
+
+test('brief style asks for a single line', () => {
+  const messages = buildMessages({ utterance: 'Q', mode: 'meeting', stylePreset: 'brief' });
+  assert.match(messages[0].content, /one direct line/i);
+  assert.doesNotMatch(messages[0].content, /• /);
+});
+
+test('bullets style keeps the original shape and stays the meeting default', () => {
+  const explicit = buildMessages({ utterance: 'Q', mode: 'meeting', stylePreset: 'bullets' });
+  const auto = buildMessages({ utterance: 'Q', mode: 'meeting', stylePreset: 'auto' });
+  assert.match(explicit[0].content, /• /);
+  assert.equal(explicit[0].content, auto[0].content);
 });
 
 test('marks the current question distinctly from history', () => {
