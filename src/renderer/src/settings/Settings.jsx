@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { SetupPanel } from './SetupPanel.jsx';
 import { SessionPanel } from './SessionPanel.jsx';
+import { CorpusPanel } from './CorpusPanel.jsx';
 import './settings.css';
 
 /**
@@ -134,6 +135,8 @@ export function Settings() {
       <SetupPanel />
 
       <SessionPanel />
+
+      <CorpusPanel />
 
       {SECTIONS.map((section) => (
         <section key={section.title}>

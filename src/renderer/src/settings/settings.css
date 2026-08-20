@@ -175,6 +175,16 @@ button:focus-visible {
   align-items: stretch;
 }
 
+/* Paths are long; wrap rather than overflow the 148px value column. */
+.corpus-dir {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-dim);
+  word-break: break-all;
+  justify-self: end;
+  text-align: right;
+}
+
 /* ---- setup panel ---- */
 
 .setup-summary {
