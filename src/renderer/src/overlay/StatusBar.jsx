@@ -15,6 +15,9 @@ export function StatusBar({ status }) {
     <div className="status">
       <span className="dot" data-state={state} />
       <span>{label}</span>
+      <span className="mode-badge" data-mode={status.mode}>
+        {status.mode === 'interview' ? 'INT' : 'MTG'}
+      </span>
       <span className="meters">
         <span className="meter" title="microphone">
           <i style={{ width: `${meterWidth(status, 'user')}%` }} />

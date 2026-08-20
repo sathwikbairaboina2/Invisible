@@ -15,6 +15,7 @@ export function useAgent() {
     llm: 'unknown',
     rag: 'unknown',
     dropped: 0,
+    mode: 'meeting',
   });
   const [turn, setTurn] = useState({ id: null, streaming: false, aborted: false });
   const [answer, setAnswer] = useState('');

@@ -68,6 +68,21 @@ body {
   background: var(--error);
 }
 
+.mode-badge {
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  opacity: 0.85;
+}
+.mode-badge[data-mode='interview'] {
+  background: rgba(122, 92, 255, 0.35);
+}
+.mode-badge[data-mode='meeting'] {
+  background: rgba(46, 160, 100, 0.35);
+}
+
 .meters {
   display: flex;
   gap: var(--unit);
