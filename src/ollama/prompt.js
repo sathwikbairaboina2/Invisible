@@ -52,6 +52,26 @@ const RULES = {
 };
 
 /**
+ * "Write me the code" and "tell me about yourself" want different shapes.
+ * Heuristic on purpose: a model round-trip here would sit on the latency
+ * path of every single question.
+ */
+const CODE_HINT =
+  /\b(implement|write (a|the|some) (function|method|class|query|script|test)|regex|regular expression|sql|code (this|it|up)|in (python|javascript|typescript|java|go|rust|c\+\+|sql)\b|algorithm for|pseudo-?code|one-?liner|snippet)\b/i;
+
+function looksLikeCodeQuestion(utterance) {
+  return CODE_HINT.test(String(utterance ?? ''));
+}
+
+/** Appended to the shape when the question asks for actual code. */
+const CODE_SHAPE = [
+  '',
+  'This is a coding question. After the first line, include one fenced code block',
+  '(``` … ```), at most 10 short lines, then at most 2 bullets on complexity or',
+  'trade-offs. The code block is the answer; keep prose minimal.',
+];
+
+/**
  * 'auto' follows the mode: an interviewer hears you speak the answer, so
  * spoken sentences rehearse better; meetings want scannable facts.
  */
@@ -153,7 +173,9 @@ function buildMessages({
   sections.push(`Answer this, in the shape described:\n${utterance}`);
 
   const system =
-    systemFor(mode, resolveStyle(mode, stylePreset)) + profileBlock(mode, profile);
+    systemFor(mode, resolveStyle(mode, stylePreset)) +
+    (looksLikeCodeQuestion(utterance) ? CODE_SHAPE.join('\n') : '') +
+    profileBlock(mode, profile);
 
   return [
     { role: 'system', content: system },
@@ -220,6 +242,7 @@ module.exports = {
   buildMessages,
   buildFollowupMessages,
   buildSummaryMessages,
+  looksLikeCodeQuestion,
   resolveStyle,
   SYSTEM_PROMPT,
   MEETING_SYSTEM_PROMPT,

@@ -7,9 +7,9 @@ import { parseAnswer } from '../parseAnswer.js';
 export function Answer({ answer, streaming, aborted }) {
   // Runs on every token, so memoise on the raw text rather than reparsing an
   // unchanged string when sibling state updates.
-  const { lead, bullets } = useMemo(() => parseAnswer(answer), [answer]);
+  const { lead, bullets, code } = useMemo(() => parseAnswer(answer), [answer]);
 
-  if (!lead && bullets.length === 0) {
+  if (!lead && bullets.length === 0 && !code) {
     return (
       <div className="answer">
         <p className="placeholder">{streaming ? 'thinking…' : 'listening for a question'}</p>
@@ -24,6 +24,7 @@ export function Answer({ answer, streaming, aborted }) {
         {streaming && bullets.length === 0 ? <span className="cursor">▌</span> : null}
         {aborted ? ' …' : null}
       </p>
+      {code ? <pre className="code-block">{code}</pre> : null}
       {bullets.length > 0 ? (
         <ul className="bullets">
           {bullets.map((bullet, i) => (

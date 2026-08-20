@@ -82,6 +82,7 @@ const SHORTCUTS = [
   ['Type a question', 'Ctrl+Shift+/'],
   ['Cycle answer style', 'Ctrl+Shift+.'],
   ['Export meeting notes', 'Ctrl+Shift+E'],
+  ['Answer clipboard text', 'Ctrl+Shift+;'],
 ];
 
 const read = (object, path) => path.split('.').reduce((node, key) => node?.[key], object);

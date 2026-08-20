@@ -5,6 +5,34 @@ const assert = require('node:assert/strict');
 
 const { parseAnswer } = require('../src/renderer/src/parseAnswer.js');
 
+test('extracts a fenced code block from a code answer', () => {
+  const parsed = parseAnswer(
+    [
+      'Two-pointer reversal.',
+      '```python',
+      'def reverse(head):',
+      '    prev = None',
+      '    return prev',
+      '```',
+      '• O(n) time, O(1) space.',
+    ].join('\n')
+  );
+  assert.equal(parsed.lead, 'Two-pointer reversal.');
+  assert.equal(parsed.code, 'def reverse(head):\n    prev = None\n    return prev');
+  assert.deepEqual(parsed.bullets, ['O(n) time, O(1) space.']);
+});
+
+test('an unterminated fence mid-stream treats the tail as code', () => {
+  const parsed = parseAnswer(['Lead.', '```js', 'const x ='].join('\n'));
+  assert.equal(parsed.lead, 'Lead.');
+  assert.equal(parsed.code, 'const x =');
+});
+
+test('answers without fences have empty code', () => {
+  const parsed = parseAnswer('Just a line.');
+  assert.equal(parsed.code, '');
+});
+
 test('splits a well-formed answer into lead and bullets', () => {
   const parsed = parseAnswer(
     [
@@ -44,9 +72,9 @@ test('ignores blank lines between the lead and the bullets', () => {
 
 test('handles a partial stream where the lead is still arriving', () => {
   // Called on every token, so it must never throw mid-word.
-  assert.deepEqual(parseAnswer('Tok'), { lead: 'Tok', bullets: [] });
-  assert.deepEqual(parseAnswer(''), { lead: '', bullets: [] });
-  assert.deepEqual(parseAnswer('Lead.\n• par'), { lead: 'Lead.', bullets: ['par'] });
+  assert.deepEqual(parseAnswer('Tok'), { lead: 'Tok', bullets: [], code: '' });
+  assert.deepEqual(parseAnswer(''), { lead: '', bullets: [], code: '' });
+  assert.deepEqual(parseAnswer('Lead.\n• par'), { lead: 'Lead.', bullets: ['par'], code: '' });
 });
 
 test('promotes a leading bullet when the model skips the lead line', () => {

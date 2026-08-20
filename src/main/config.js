@@ -154,5 +154,7 @@ module.exports = {
     cycleStyle: 'Control+Shift+.',
     /** Write the meeting log to Documents/Invisible and reveal the file. */
     exportMeeting: 'Control+Shift+E',
+    /** Answer the text currently on the clipboard. */
+    askClipboard: 'Control+Shift+;',
   },
 };

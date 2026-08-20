@@ -19,15 +19,37 @@ function stripEmphasis(line) {
  * a half-written line.
  *
  * @param {string} text
- * @returns {{lead: string, bullets: string[]}}
+ * @returns {{lead: string, bullets: string[], code: string}}
  */
 function parseAnswer(text) {
-  const lines = String(text ?? '')
+  const raw = String(text ?? '');
+
+  // Fenced code first: everything between the first pair of ``` markers is
+  // code verbatim. Streaming means the closing fence may not exist yet — then
+  // the whole tail is code, which keeps the block growing live.
+  let code = '';
+  let prose = raw;
+  const fence = raw.indexOf('```');
+  if (fence !== -1) {
+    const afterOpen = raw.indexOf('\n', fence);
+    const close = afterOpen === -1 ? -1 : raw.indexOf('```', afterOpen);
+    if (afterOpen === -1) {
+      prose = raw.slice(0, fence);
+    } else if (close === -1) {
+      code = raw.slice(afterOpen + 1);
+      prose = raw.slice(0, fence);
+    } else {
+      code = raw.slice(afterOpen + 1, close).replace(/\n$/, '');
+      prose = raw.slice(0, fence) + '\n' + raw.slice(close + 3);
+    }
+  }
+
+  const lines = prose
     .split('\n')
     .map((line) => line.trimEnd())
     .filter((line) => line.trim().length > 0);
 
-  if (lines.length === 0) return { lead: '', bullets: [] };
+  if (lines.length === 0) return { lead: '', bullets: [], code };
 
   const bullets = [];
   let lead = '';
@@ -50,7 +72,7 @@ function parseAnswer(text) {
     lead = bullets.shift();
   }
 
-  return { lead, bullets };
+  return { lead, bullets, code };
 }
 
 module.exports = { parseAnswer };

@@ -101,6 +101,20 @@ body {
   background: rgba(46, 160, 100, 0.35);
 }
 
+.answer .code-block {
+  margin: calc(var(--unit) * 1.5) 0;
+  padding: calc(var(--unit) * 2) calc(var(--unit) * 2.5);
+  font-family: var(--mono, Consolas, monospace);
+  font-size: 11.5px;
+  line-height: 1.5;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--divider, rgba(255, 255, 255, 0.1));
+  border-radius: 6px;
+  overflow-x: auto;
+  white-space: pre;
+  user-select: text;
+}
+
 .style-chip {
   font-size: 10px;
   letter-spacing: 0.04em;

@@ -9,6 +9,7 @@ const {
   session,
   screen,
   shell,
+  clipboard,
 } = require('electron');
 const path = require('node:path');
 
@@ -496,6 +497,7 @@ function registerShortcuts() {
     [shortcuts.askInput, () => openAskInput()],
     [shortcuts.cycleStyle, () => cycleStyle()],
     [shortcuts.exportMeeting, () => exportMeeting()],
+    [shortcuts.askClipboard, () => askClipboard()],
   ];
 
   const failed = [];
@@ -564,6 +566,21 @@ function exportMeeting() {
     log('export failed:', err.message);
     sendToOverlay(CHANNELS.AGENT_ERROR, { scope: 'export', message: err.message });
   }
+}
+
+/**
+ * Answer whatever text is on the clipboard — a copied ticket, a chat message,
+ * a coding problem. Capped so a stray 200 KB copy cannot flood the prompt.
+ */
+function askClipboard() {
+  const text = clipboard.readText().trim().slice(0, 2000);
+  if (!text) {
+    log('clipboard ask skipped: clipboard has no text');
+    return;
+  }
+  log('clipboard ask', `${text.length} chars`);
+  if (!state.visible) setVisible(true);
+  agent?.ask(text);
 }
 
 /** Hotkey path to a typed question: make the overlay clickable, open the box. */

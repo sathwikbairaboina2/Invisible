@@ -7,6 +7,7 @@ const {
   buildMessages,
   buildFollowupMessages,
   buildSummaryMessages,
+  looksLikeCodeQuestion,
   SYSTEM_PROMPT,
   resolveStyle,
 } = require('../src/ollama/prompt');
@@ -223,6 +224,37 @@ test('summary prompt folds older turns into the previous summary within the word
   assert.match(messages[0].content, /80 words/);
   assert.match(messages[1].content, /Talked about sharding\./);
   assert.match(messages[1].content, /Redis with a token bucket\./);
+});
+
+test('coding questions are detected, conversational ones are not', () => {
+  const coding = [
+    'Write a function to reverse a linked list',
+    'Implement a rate limiter in Python',
+    'What regex matches an email address?',
+    'Show me the SQL query for the top 5 customers',
+    'How would you code this in TypeScript?',
+  ];
+  const talk = [
+    'Tell me about yourself',
+    'Why do you want to work here?',
+    'What did we decide about the budget?',
+    'How would you shard a large table?',
+  ];
+  for (const q of coding) assert.equal(looksLikeCodeQuestion(q), true, q);
+  for (const q of talk) assert.equal(looksLikeCodeQuestion(q), false, q);
+});
+
+test('a coding question unlocks a fenced code block in the shape', () => {
+  const messages = buildMessages({
+    utterance: 'Write a function to reverse a linked list',
+    mode: 'interview',
+  });
+  assert.match(messages[0].content, /fenced code block/i);
+});
+
+test('a conversational question keeps the no-fences rule', () => {
+  const messages = buildMessages({ utterance: 'Tell me about yourself', mode: 'interview' });
+  assert.doesNotMatch(messages[0].content, /fenced code block/i);
 });
 
 test('marks the current question distinctly from history', () => {
