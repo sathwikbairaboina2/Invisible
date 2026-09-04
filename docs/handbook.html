@@ -1,0 +1,583 @@
+<title>Invisible Handbook</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --ground: #f4f4f8;
+    --surface: #ffffff;
+    --surface-2: #f7f7fb;
+    --border: #dcdce6;
+    --divider: #e7e7ef;
+    --text: #191922;
+    --dim: #4f4f5e;
+    --faint: #82828f;
+    --accent: #6247d6;
+    --accent-soft: rgba(98, 71, 214, 0.10);
+    --live: #187a4b;
+    --live-soft: rgba(24, 122, 75, 0.10);
+    --warn: #9a6a10;
+    --warn-soft: rgba(154, 106, 16, 0.10);
+    --code-bg: #f0f0f6;
+    --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+    --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+    --mono: "IBM Plex Mono", Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0c0c11;
+      --surface: #15151c;
+      --surface-2: #1b1b24;
+      --border: #262630;
+      --divider: #1f1f29;
+      --text: #e9e9ef;
+      --dim: #a2a2b1;
+      --faint: #71717f;
+      --accent: #8b74ff;
+      --accent-soft: rgba(139, 116, 255, 0.16);
+      --live: #3fbf7f;
+      --live-soft: rgba(63, 191, 127, 0.14);
+      --warn: #e0a84a;
+      --warn-soft: rgba(224, 168, 74, 0.14);
+      --code-bg: #101017;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #0c0c11;
+    --surface: #15151c;
+    --surface-2: #1b1b24;
+    --border: #262630;
+    --divider: #1f1f29;
+    --text: #e9e9ef;
+    --dim: #a2a2b1;
+    --faint: #71717f;
+    --accent: #8b74ff;
+    --accent-soft: rgba(139, 116, 255, 0.16);
+    --live: #3fbf7f;
+    --live-soft: rgba(63, 191, 127, 0.14);
+    --warn: #e0a84a;
+    --warn-soft: rgba(224, 168, 74, 0.14);
+    --code-bg: #101017;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--text);
+    font-family: var(--body);
+    font-size: 15px;
+    line-height: 1.65;
+  }
+  .frame {
+    display: grid;
+    grid-template-columns: 218px minmax(0, 1fr);
+    gap: 48px;
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 0 28px 96px;
+  }
+  @media (max-width: 860px) {
+    .frame { grid-template-columns: minmax(0, 1fr); gap: 0; }
+    nav.toc { display: none; }
+  }
+
+  nav.toc {
+    position: sticky;
+    top: 0;
+    align-self: start;
+    height: 100vh;
+    overflow-y: auto;
+    padding: 44px 0 32px;
+    font-size: 12.5px;
+  }
+  nav.toc .brand {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: 17px;
+    letter-spacing: -0.01em;
+    margin-bottom: 4px;
+  }
+  nav.toc .brand-sub {
+    color: var(--faint);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    margin-bottom: 24px;
+  }
+  nav.toc a {
+    display: block;
+    color: var(--dim);
+    text-decoration: none;
+    padding: 5px 10px;
+    border-left: 2px solid var(--divider);
+  }
+  nav.toc a:hover, nav.toc a:focus-visible {
+    color: var(--text);
+    border-left-color: var(--accent);
+    outline: none;
+  }
+
+  main { padding-top: 44px; min-width: 0; }
+
+  header.hero { margin-bottom: 56px; }
+  .hero h1 {
+    font-family: var(--display);
+    font-size: clamp(34px, 6vw, 52px);
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    line-height: 1.05;
+    margin: 0 0 14px;
+    text-wrap: balance;
+  }
+  .hero h1 .dim { color: var(--faint); font-weight: 500; }
+  .hero p.lede {
+    font-size: 17px;
+    color: var(--dim);
+    max-width: 58ch;
+    margin: 0 0 20px;
+  }
+  .hero .facts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    font-family: var(--mono);
+    font-size: 11.5px;
+  }
+  .hero .facts span {
+    padding: 3px 10px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    color: var(--dim);
+    background: var(--surface);
+  }
+  .hero .facts span.hot { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+
+  section { margin-bottom: 64px; }
+  h2 {
+    font-family: var(--display);
+    font-size: 24px;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    margin: 0 0 6px;
+    scroll-margin-top: 24px;
+  }
+  .kicker {
+    font-family: var(--mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--accent);
+    margin-bottom: 6px;
+  }
+  h3 {
+    font-family: var(--display);
+    font-size: 16.5px;
+    font-weight: 600;
+    margin: 28px 0 8px;
+  }
+  p { margin: 0 0 14px; max-width: 68ch; }
+  p.note { color: var(--dim); font-size: 13.5px; }
+  a { color: var(--accent); }
+
+  code {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    background: var(--code-bg);
+    border: 1px solid var(--divider);
+    border-radius: 4px;
+    padding: 1px 5px;
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    overflow-x: auto;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    line-height: 1.6;
+  }
+  pre code { background: none; border: 0; padding: 0; }
+
+  .scroll { overflow-x: auto; }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 13.5px;
+    margin: 10px 0 6px;
+  }
+  th {
+    text-align: left;
+    font-family: var(--mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--faint);
+    font-weight: 500;
+    padding: 8px 14px 8px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  td {
+    padding: 9px 14px 9px 0;
+    border-bottom: 1px solid var(--divider);
+    vertical-align: top;
+  }
+  td.num { font-family: var(--mono); font-size: 12.5px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  td strong { font-weight: 600; }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+  }
+  .grid-2 {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 14px;
+    margin: 14px 0;
+  }
+  .card h4 {
+    margin: 0 0 6px;
+    font-family: var(--display);
+    font-size: 14.5px;
+    font-weight: 600;
+  }
+  .card p { font-size: 13.5px; color: var(--dim); margin: 0; max-width: none; }
+
+  .pill {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    padding: 1px 8px;
+    border-radius: 999px;
+    vertical-align: 2px;
+    margin-left: 8px;
+  }
+  .pill.done { background: var(--live-soft); color: var(--live); }
+  .pill.next { background: var(--accent-soft); color: var(--accent); }
+  .pill.block { background: var(--warn-soft); color: var(--warn); }
+  .pill.later { background: var(--code-bg); color: var(--faint); border: 1px solid var(--divider); }
+
+  figure { margin: 22px 0; }
+  figure svg { max-width: 100%; height: auto; display: block; }
+  figcaption {
+    font-size: 12.5px;
+    color: var(--faint);
+    margin-top: 10px;
+    max-width: 70ch;
+  }
+
+  ol.steps { padding-left: 0; margin: 14px 0; list-style: none; counter-reset: step; max-width: 70ch; }
+  ol.steps li {
+    counter-increment: step;
+    position: relative;
+    padding: 0 0 16px 44px;
+  }
+  ol.steps li::before {
+    content: counter(step);
+    position: absolute;
+    left: 0; top: 1px;
+    width: 26px; height: 26px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--accent);
+    font-family: var(--mono);
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  ol.steps li strong { display: block; margin-bottom: 2px; }
+  ol.steps li p { font-size: 13.5px; color: var(--dim); margin: 0; }
+
+  ul.tight { margin: 8px 0 14px; padding-left: 20px; max-width: 68ch; }
+  ul.tight li { margin-bottom: 6px; }
+
+  .callout {
+    border-left: 3px solid var(--warn);
+    background: var(--surface);
+    border-radius: 0 8px 8px 0;
+    padding: 12px 16px;
+    font-size: 13.5px;
+    color: var(--dim);
+    max-width: 70ch;
+    margin: 16px 0;
+  }
+  .callout strong { color: var(--text); }
+</style>
+
+<div class="frame">
+<nav class="toc">
+  <div class="brand">Invisible</div>
+  <div class="brand-sub">Handbook</div>
+  <a href="#warning">Before you use it</a>
+  <a href="#overview">Overview</a>
+  <a href="#flow-turn">Flow: a question</a>
+  <a href="#flow-memory">Flow: conversation memory</a>
+  <a href="#flow-corpus">Flow: your corpus</a>
+  <a href="#flow-ipc">Flow: IPC surface</a>
+  <a href="#shortcuts">Shortcuts</a>
+  <a href="#running">Running it</a>
+  <a href="#testing">Testing</a>
+</nav>
+
+<main>
+<header class="hero">
+  <h1>Invisible <span class="dim">— a local assistant on a capture-excluded overlay</span></h1>
+  <p class="lede">It listens to a live conversation, transcribes it, and streams model-generated advice onto a transparent window that screen capture cannot see. Nothing leaves the machine — no audio, no transcript, no model call.</p>
+  <div class="facts">
+    <span>Electron + LangGraph.js</span>
+    <span>Windows 11 x64 only</span>
+    <span class="hot">no HTTP API</span>
+    <span>whisper.cpp :8178</span>
+    <span>Ollama :11436</span>
+    <span>Qdrant :6333</span>
+  </div>
+</header>
+
+<section id="warning">
+  <div class="kicker">Read first</div>
+  <h2>Before you use this</h2>
+<div class="callout"><strong>Recording a conversation without the other party's consent is
+unlawful in two-party-consent jurisdictions</strong> — including California, Washington,
+Illinois, and most of the EU. The design reflects that: audio is never written to disk, the
+transcript lives only in memory capped at 40 turns, and one keystroke
+(<code>Ctrl+Shift+X</code>) stops capture, clears state, and hides the overlay.</div>
+
+<div class="callout"><strong>Using this in a live interview is deception of the
+interviewer.</strong> Most employers treat it as grounds for rescinding an offer, and some
+proctored platforms detect overlay or process anomalies. The software does not enforce that
+judgement; it is yours to make.</div>
+
+<h3>What the capture exclusion does and does not do</h3>
+<p><code>setContentProtection</code> maps to <code>WDA_EXCLUDEFROMCAPTURE</code> on Windows. It
+defeats Zoom, Teams, Meet, OBS, Game Bar, and PrintScreen. It does <strong>not</strong> defeat a
+phone camera pointed at the screen, and it does <strong>not</strong> hide the process from
+software that enumerates running executables.</p>
+</section>
+
+<section id="overview">
+  <div class="kicker">What it is</div>
+  <h2>The shape of the thing</h2>
+<pre><code>microphone ─┐                                    ┌─ Qdrant (your corpus)
+            ├─ Silero VAD ─ whisper.cpp ─ triage ┤
+system audio┘                                    └─ Ollama ─ overlay</code></pre>
+
+<p>Speaker identity comes from <em>which capture chain the audio arrived on</em>, so no
+diarization model is needed. Your own speech is transcribed but never answered.</p>
+
+<p>Measured end to end: <strong>~673 ms</strong> from end of question to first visible word —
+384 ms VAD close, 113 ms transcription, 60 ms retrieval, 164 ms to first token.</p>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Path</th><th>Contents</th></tr></thead>
+  <tbody>
+    <tr><td class="num">src/main</td><td>Electron main process: window, overlay position, shortcuts, settings store, session state, export, setup check.</td></tr>
+    <tr><td class="num">src/audio</td><td>The capture worker — two chains, Silero VAD, utterance assembly.</td></tr>
+    <tr><td class="num">src/whisper</td><td>whisper.cpp server lifecycle and client.</td></tr>
+    <tr><td class="num">src/qdrant</td><td>Corpus ingestion and retrieval.</td></tr>
+    <tr><td class="num">src/ollama</td><td>Model client.</td></tr>
+    <tr><td class="num">src/graph</td><td>The four-node LangGraph agent.</td></tr>
+    <tr><td class="num">src/renderer</td><td>The overlay UI.</td></tr>
+  </tbody>
+</table>
+</div>
+</section>
+
+<section id="flow-turn">
+  <div class="kicker">Flow 1 of 4</div>
+  <h2>From sound to an answer on screen</h2>
+<pre><code>START ─► transcriber ─► triage ─┬─(respond)─► retriever ─► generator ─► END
+                                └─(ignore)──────────────────────────────► END</code></pre>
+
+<p>Four nodes, injected rather than imported, so the routing is testable without a model, a
+vector store, or a speech recogniser.</p>
+
+<ol class="steps">
+  <li><strong>Capture and VAD</strong>
+    <p>Two chains — microphone and system audio — at 16 kHz mono, the rate whisper wants, so
+    Chromium resamples every source through a proper anti-alias filter. Silero v5 closes an
+    utterance after <code>redemptionMs</code> of silence: 640 ms in interview mode, 384 ms in
+    meeting mode, because measured interview questions carry 500–1000 ms mid-question
+    hesitations. Utterances under 192 ms are discarded as coughs and keyboard clicks.</p></li>
+  <li><strong>Speculative transcription</strong>
+    <p>After six consecutive silent frames mid-utterance, the audio so far is transcribed
+    <em>while the redemption window is still open</em>. If the utterance then ends in that same
+    silence, the draft is reused and both the whisper cost and the rest of the window vanish
+    from the latency path.</p></li>
+  <li><strong>transcriber</strong>
+    <p>whisper.cpp over HTTP on 127.0.0.1:8178. One model instance; at most 8 utterances may
+    queue, and beyond that the <em>oldest is dropped and counted</em> — a growing backlog means
+    the overlay is answering a question from a minute ago, which is worse than missing one.</p></li>
+  <li><strong>triage</strong>
+    <p>Decides <code>respond</code> or <code>ignore</code>. Your own speech routes to
+    <code>ignore</code> here; that is where the "never answers you" rule lives.</p></li>
+  <li><strong>retriever</strong>
+    <p>Qdrant, top 4, cosine score threshold <strong>0.6</strong>.</p></li>
+  <li><strong>generator</strong>
+    <p>Ollama, <code>qwen2.5-coder:14b-instruct-q4_K_M</code>, temperature 0.2,
+    <code>numPredict: 200</code> to cap a runaway answer, <code>keepAlive: 30m</code> so the 9 GB
+    model stays resident between questions. Tokens stream to the overlay as they arrive.</p></li>
+</ol>
+
+<div class="callout"><strong>Why the retrieval threshold is 0.6, not 0.45.</strong>
+<code>nomic-embed-text</code> scores any two English sentences highly — measured on a real
+corpus, a pure algorithms question still pulled a résumé story at 0.51. With the model's task
+prefixes applied, genuine hits land at 0.62–0.72 and irrelevant ones peak around 0.56. The
+threshold exists to <em>exclude</em>, not to maximise recall: the overlay shows four lines, and a
+marginal match displaces real answer.</div>
+</section>
+
+<section id="flow-memory">
+  <div class="kicker">Flow 2 of 4</div>
+  <h2>What it remembers, and for how long</h2>
+<ul class="tight">
+  <li><strong>40 turns</strong> retained in graph state; older turns are dropped.</li>
+  <li><strong>8 turns</strong> of dialogue are sent to the model, so follow-up questions
+  resolve.</li>
+  <li>Turns falling out of that window are folded into a running summary of under 80 words,
+  refreshed <strong>every 6 new turns</strong>.</li>
+  <li><strong>Nothing is written to disk.</strong> Not audio, not transcript. The cap is memory
+  policy, not a retention policy — there is no store to retain into.</li>
+</ul>
+
+<p><code>Ctrl+Shift+K</code> clears the transcript. <code>Ctrl+Shift+X</code> — panic — stops
+capture, clears state and hides the window in one press with no confirmation dialog;
+<code>Ctrl+Shift+'</code> resumes capture afterwards.</p>
+</section>
+
+<section id="flow-corpus">
+  <div class="kicker">Flow 3 of 4</div>
+  <h2>Grounding answers in your own material</h2>
+<p>Drop markdown into <code>corpus/</code> — résumé, project write-ups, prepared STAR stories,
+notes on the company — then <code>npm run ingest</code>.</p>
+
+<div class="callout"><strong>Write one idea per <code>##</code> section.</strong> Chunks split on
+headings, so a section that is one coherent story retrieves cleanly while a section covering four
+jobs retrieves as mush. Sections longer than 1200 characters are split again on paragraph
+boundaries.</div>
+
+<p><code>INVISIBLE_CORPUS_DIR</code> points the ingester at notes kept outside the repo — an
+Obsidian vault, for instance. Nothing in <code>corpus/</code> is committed. Without a corpus the
+app works fine; answers are simply less specific.</p>
+</section>
+
+<section id="flow-ipc">
+  <div class="kicker">Flow 4 of 4</div>
+  <h2>The IPC surface — this app’s API</h2>
+<p><strong>Invisible has no HTTP API and therefore no Swagger.</strong> It is a desktop
+application; its interface is Electron IPC plus a set of global shortcuts. The equivalent
+contract lives in <code>src/main/channels.js</code>.</p>
+
+<div class="callout"><strong>Every channel name is in one file, and both preloads use it as an
+allow-list.</strong> A compromised renderer cannot reach an unlisted channel. Adding a channel
+means adding it there — nowhere else grants access.</div>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Direction</th><th>Channels</th></tr></thead>
+  <tbody>
+    <tr><td>main → overlay</td><td class="num">agent:token · agent:turn-start · agent:turn-end · agent:followup · agent:error · transcript:partial · transcript:final · status:update · overlay:mode · overlay:ask-open</td></tr>
+    <tr><td>overlay → main</td><td class="num">overlay:ready · agent:cancel · agent:clear · agent:ask · overlay:set-interactive</td></tr>
+    <tr><td>renderer → main (invoke/handle)</td><td class="num">settings:get · settings:set · settings:reset · setup:check · session:get · session:set · corpus:status · corpus:ingest</td></tr>
+    <tr><td>renderer → main (fire and forget)</td><td class="num">settings:open</td></tr>
+    <tr><td>main → audio worker</td><td class="num">audio:start · audio:stop</td></tr>
+    <tr><td>audio worker → main</td><td class="num">audio:utterance · audio:utterance-partial · audio:speech-start · audio:level · audio:error · audio:ready</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>The external services it speaks to</h3>
+<div class="scroll">
+<table>
+  <thead><tr><th>Service</th><th>Endpoint</th><th>Note</th></tr></thead>
+  <tbody>
+    <tr><td>whisper.cpp</td><td class="num">POST http://127.0.0.1:8178/inference</td><td>A vendored binary, not part of this codebase. Restarts up to 3 times after an unexpected exit.</td></tr>
+    <tr><td>Ollama</td><td class="num">http://127.0.0.1:11436</td><td><strong>11436, not 11434.</strong> Containers from other projects already bind 11434 and 11435; this app owns its own GPU container. Must match <code>docker/compose.yml</code>.</td></tr>
+    <tr><td>Qdrant</td><td class="num">http://127.0.0.1:6333</td><td>Collection <code>invisible_context</code>.</td></tr>
+  </tbody>
+</table>
+</div>
+</section>
+
+<section id="shortcuts">
+  <div class="kicker">Interface</div>
+  <h2>Shortcuts</h2>
+<p>Accelerators were chosen to avoid collisions with IDEs, browsers, and Zoom.</p>
+
+<div class="scroll">
+<table>
+  <tbody>
+    <tr><td class="num">Ctrl+Shift+\</td><td>Show / hide the overlay</td></tr>
+    <tr><td class="num">Ctrl+Shift+Enter</td><td>Toggle click-through (blue border = clickable)</td></tr>
+    <tr><td class="num">Ctrl+Shift+Space</td><td>Answer the last question again</td></tr>
+    <tr><td class="num">Ctrl+Shift+K</td><td>Clear the transcript</td></tr>
+    <tr><td class="num">Ctrl+Shift+X</td><td><strong>Panic</strong> — stop capture, clear, hide</td></tr>
+    <tr><td class="num">Ctrl+Shift+Arrows</td><td>Move the overlay</td></tr>
+    <tr><td class="num">Ctrl+Shift+,</td><td>Settings</td></tr>
+    <tr><td class="num">Ctrl+Shift+M</td><td>Toggle interview / meeting mode (persisted)</td></tr>
+    <tr><td class="num">Ctrl+Shift+/</td><td>Type a question to the assistant</td></tr>
+    <tr><td class="num">Ctrl+Shift+.</td><td>Cycle answer style (auto / bullets / spoken / brief)</td></tr>
+    <tr><td class="num">Ctrl+Shift+E</td><td>Export meeting notes to Documents\Invisible</td></tr>
+    <tr><td class="num">Ctrl+Shift+;</td><td>Answer the text currently on the clipboard</td></tr>
+    <tr><td class="num">Ctrl+Shift+O</td><td>Jump the overlay to the next screen corner</td></tr>
+    <tr><td class="num">Ctrl+Shift+'</td><td>Resume capture after panic</td></tr>
+    <tr><td class="num">Ctrl+Shift+G</td><td>OCR the screen and answer what it asks</td></tr>
+  </tbody>
+</table>
+</div>
+</section>
+
+<section id="running">
+  <div class="kicker">Operations</div>
+  <h2>Running it</h2>
+<p>Verify Docker can reach the GPU before anything else — if this does not print your GPU,
+nothing below works at a usable speed:</p>
+<pre><code>docker run --rm --gpus all nvidia/cuda:12.4.0-base-ubuntu22.04 nvidia-smi</code></pre>
+
+<pre><code>npm install                 # also vendors the VAD and ONNX assets
+npm run services:up         # Ollama + Qdrant containers, GPU-enabled
+npm run ollama:pull         # answer model, 9 GB
+npm run embed:pull          # embedding model, 274 MB
+npm run fetch-whisper       # whisper binary + model, 2.3 GB
+npm run dev</code></pre>
+
+<p>Then press <code>Ctrl+Shift+,</code> and read the <strong>Setup</strong> panel. It probes
+every dependency and prints the exact command for anything missing. <em>It never changes
+anything itself</em> — every fix is a command you run.</p>
+
+<div class="callout"><strong>Headphones are mandatory.</strong> Through speakers the microphone
+re-captures system audio and every remote utterance is transcribed twice. Requirements otherwise:
+Windows 11 x64, an NVIDIA GPU with 12 GB+ VRAM (developed on a 4090), Docker Desktop with the
+WSL2 backend and GPU passthrough, Node 24+, and ~13 GB of disk.</div>
+
+<h3>Installer</h3>
+<pre><code>npm run dist     # release/Invisible Setup 0.1.0.exe, about 107 MB</code></pre>
+<p>It bundles app code only — place <code>bin/</code> and <code>models/</code> beside the
+installed <code>Invisible.exe</code>, or copy them from a source checkout. <strong>The installer
+is unsigned</strong>; SmartScreen warns on first run.</p>
+
+<p>Or via the devkit: <code>powershell -File $dk\invisible\devup.ps1 -CheckOnly -Test</code></p>
+</section>
+
+<section id="testing">
+  <div class="kicker">Verification</div>
+  <h2>Testing</h2>
+<pre><code>npm test          # node --test "test/**/*.test.js"
+npm run replay    # scripts/replay-interview.js — drive the graph from a fixture</code></pre>
+
+<p>The graph nodes are injected, so <code>buildGraph</code> is tested with four stub functions
+and no infrastructure at all. <code>replay-interview.js</code> is the integration path: it feeds
+a recorded transcript through the real graph, which is how latency and retrieval quality get
+measured without holding a live conversation.</p>
+</section>
+
+<p class="note">Generated from <code>_devkit/docs/handbook/content/invisible.mjs</code> by
+<code>_devkit/docs/handbook/build.mjs</code>. Edit the content module, not this file.</p>
+</main>
+</div>
