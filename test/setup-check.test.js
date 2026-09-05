@@ -10,12 +10,12 @@ function healthy(overrides = {}) {
   return {
     fileExists: () => true,
     fileSize: () => 1_624_555_275,
-    dockerPs: async () => ['invisible-ollama', 'invisible-qdrant'],
+    dockerPs: async () => ['invisible-qdrant'],
     ollamaProbe: async () => ({ ok: true, hasModel: true, models: ['qwen2.5-coder:14b'] }),
     qdrantProbe: async () => ({ ok: true, exists: true, points: 42 }),
     config: {
       whisper: { binary: 'bin/whisper-server.exe', model: 'models/ggml-large-v3-turbo.bin' },
-      agent: { model: 'qwen2.5-coder:14b', ollamaBaseUrl: 'http://127.0.0.1:11435' },
+      agent: { model: 'qwen2.5-coder:14b', ollamaBaseUrl: 'http://127.0.0.1:11434' },
     },
     ...overrides,
   };
@@ -52,16 +52,27 @@ test('a stopped Docker daemon is reported once, not as six separate failures', a
   assert.match(docker.detail, /Docker Desktop/i);
 
   // Downstream checks are reported as blocked rather than independently failed.
-  assert.equal(byId(report, 'ollama-container').state, 'missing');
-  assert.match(byId(report, 'ollama-container').detail, /Docker/i);
+  assert.equal(byId(report, 'qdrant-container').state, 'missing');
+  assert.match(byId(report, 'qdrant-container').detail, /Docker/i);
+  // Ollama is the host install, not a container: Docker being down says nothing about it.
+  assert.equal(byId(report, 'ollama-model').state, 'ok');
 });
 
 test('a missing container names the command that starts it', async () => {
-  const report = await checkSetup(healthy({ dockerPs: async () => ['invisible-qdrant'] }));
+  const report = await checkSetup(healthy({ dockerPs: async () => [] }));
 
-  const check = byId(report, 'ollama-container');
+  const check = byId(report, 'qdrant-container');
   assert.equal(check.state, 'missing');
   assert.equal(check.fix, 'npm run services:up');
+  assert.equal(report.ok, false);
+});
+
+test('an unreachable host Ollama names the app to start', async () => {
+  const report = await checkSetup(healthy({ ollamaProbe: async () => ({ ok: false, hasModel: false, models: [] }) }));
+
+  const check = byId(report, 'ollama-model');
+  assert.equal(check.state, 'error');
+  assert.match(check.fix, /Ollama app/);
   assert.equal(report.ok, false);
 });
 

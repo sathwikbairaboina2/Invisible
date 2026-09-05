@@ -98,16 +98,15 @@ module.exports = {
   },
 
   agent: {
-    // Port 11436, not Ollama's default 11434: containers from other projects on
-    // this machine already bind 11434 and 11435, and this app owns its own
-    // GPU-enabled container. Must match docker/compose.yml.
-    ollamaBaseUrl: process.env.OLLAMA_HOST || 'http://127.0.0.1:11436',
-    model: process.env.INVISIBLE_MODEL || 'qwen2.5-coder:14b-instruct-q4_K_M',
+    // The Ollama installed on the host, on its default port, shared by every
+    // project on this machine. See docker/compose.yml for why no container.
+    ollamaBaseUrl: process.env.OLLAMA_HOST || 'http://127.0.0.1:11434',
+    model: process.env.INVISIBLE_MODEL || 'qwen3.8:27b',
     embedModel: process.env.INVISIBLE_EMBED_MODEL || 'nomic-embed-text',
     temperature: 0.2,
     /** Caps a runaway answer; the requested shape is under 60 words. */
     numPredict: 200,
-    /** Keeps the 9 GB model resident between questions. */
+    /** Keeps the 17 GB model resident between questions. */
     keepAlive: '30m',
     /** Dialogue turns sent to the model, so follow-up questions resolve. */
     historyTurns: 8,

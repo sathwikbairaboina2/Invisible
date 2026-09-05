@@ -1,49 +1,23 @@
 # Local services for Invisible, deliberately separate from any other project's
 # stack.
 #
-# Two other containers on this machine (avatara-backend, marketplace) both run
-# Ollama, both bind host port 11434, and both were created without GPU access.
-# Reusing either would tie this app's runtime to another project's compose
-# lifecycle and would run a 14B model on CPU at roughly 2-3 tokens per second.
-# Hence: own services, own volumes, own ports.
+# Only Qdrant lives here. Generation and embedding go to the Ollama installed
+# on the host (127.0.0.1:11434, the OLLAMA_HOST default in src/main/config.js),
+# which every project on this machine shares: one runtime, one model store,
+# and the GPU attached natively. The per-project container this file used to
+# run cost RAM the box does not have. Pull once on the host:
+#   ollama pull qwen3.8:27b
+#   ollama pull nomic-embed-text
+#
+# Two settings that container carried now belong to the host daemon, as user
+# environment variables read by the Ollama app: OLLAMA_MAX_LOADED_MODELS=2 so
+# the embedder and the 27B stay resident together (measured thrash without it:
+# first token 164 ms -> 4823 ms), and OLLAMA_KEEP_ALIVE, which this app also
+# sends per request (agent.keepAlive) so the daemon default does not matter.
 
 name: invisible
 
 services:
-  ollama:
-    image: ollama/ollama:latest
-    container_name: invisible-ollama
-    restart: unless-stopped
-    ports:
-      # 11436 on the host. 11434 is taken by two other projects' containers, and
-      # 11435 - the original choice here - is now taken by a third. Inside the
-      # container Ollama still listens on its default port.
-      - "127.0.0.1:11436:11434"
-    volumes:
-      - invisible-ollama-models:/root/.ollama
-    environment:
-      # Keep the model resident between questions. The default unloads after a
-      # few minutes idle, which would put a full model load in front of the
-      # first question after any pause in the conversation.
-      OLLAMA_KEEP_ALIVE: "30m"
-      # One request at a time: this is a latency-sensitive single user, not a
-      # throughput-sensitive service.
-      OLLAMA_NUM_PARALLEL: "1"
-      # Two models, not one. Retrieval embeds with nomic-embed-text while
-      # generation uses the 14B, and at a cap of 1 every question evicted the
-      # 14B to load the embedder and then reloaded the 14B to answer. Measured
-      # cost of that thrash: first token went from 164 ms to 4823 ms. The 14B
-      # needs ~15 GB with its context and the embedder ~0.3 GB, so both sit in
-      # 24 GB with room to spare.
-      OLLAMA_MAX_LOADED_MODELS: "2"
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
-
   qdrant:
     image: qdrant/qdrant:latest
     container_name: invisible-qdrant
@@ -57,5 +31,4 @@ services:
       - invisible-qdrant-storage:/qdrant/storage
 
 volumes:
-  invisible-ollama-models:
   invisible-qdrant-storage:

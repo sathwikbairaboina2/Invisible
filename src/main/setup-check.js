@@ -61,10 +61,7 @@ async function checkSetup(deps) {
   // Reporting six red rows for one cause buries the actual problem.
   const blocked = containers === null;
 
-  for (const [id, name, label] of [
-    ['ollama-container', 'invisible-ollama', 'Ollama container'],
-    ['qdrant-container', 'invisible-qdrant', 'Qdrant container'],
-  ]) {
+  for (const [id, name, label] of [['qdrant-container', 'invisible-qdrant', 'Qdrant container']]) {
     if (blocked) {
       add(id, label, 'missing', 'Blocked: Docker is not running', null);
     } else if (containers.includes(name)) {
@@ -75,9 +72,9 @@ async function checkSetup(deps) {
   }
 
   // --- Ollama model -------------------------------------------------------
-  if (blocked || !containers.includes('invisible-ollama')) {
-    add('ollama-model', 'Answer model pulled', 'missing', 'Blocked: Ollama is not running', null);
-  } else {
+  // Ollama is the host install, not a container, so Docker being down does not
+  // block it: probe the daemon directly.
+  {
     try {
       const result = await ollamaProbe();
       if (!result.ok) {
@@ -86,7 +83,7 @@ async function checkSetup(deps) {
           'Answer model pulled',
           'error',
           `Ollama unreachable at ${config.agent.ollamaBaseUrl}`,
-          'npm run services:up'
+          'Start the Ollama app'
         );
       } else if (!result.hasModel) {
         add(
